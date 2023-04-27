@@ -12,6 +12,7 @@ sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
+colorama = "*"
 
 [requires]
 python_version = "3.10"
