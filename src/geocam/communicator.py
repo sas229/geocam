@@ -17,8 +17,22 @@ class Communicator():
         """
         return
     
-    def create_json(self): 
+    def ping(self): 
+        """
+        - Send a ping on the lan
+        """
+        return
+    
+    def stream(self): 
+        """
+        - Stream video to a ip address
+        """
+        return
+        
+    def _create_json(self): 
         """
         - Will be used to create JSON files
         """
         return 
+    
+    

@@ -41,13 +41,6 @@ class Controller:
         - Calls functions from the calibration module 
         """ 
         return
-
-    def calibrate(self): 
-        """
-        - Get the calibration data for each camera
-        - Call the Calibration module 
-        """
-        return 
     
     def aquire_images(self):
         """
