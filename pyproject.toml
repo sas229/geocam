@@ -1,0 +1,40 @@
+[build-system]
+requires = [
+    "setuptools",
+    "wheel",
+    "scikit-build",
+    "cmake",
+    "ninja"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geocam"
+version = "0.0.1"
+authors = [
+  { name="Hilario Greggi", email="greggi.hilario@gmail.com" },
+  { name="Sam Stanier", email="sas229@cam.ac.uk" },
+  { name="Zewen Wang", email="zewen.wang@research.uwa.edu.au" },
+  { name="Wenhan Du", email="wenhan.du@research.uwa.edu.au" },
+  { name="Barry Lehane", email="barry.lehane@uwa.edu.au" },
+
+]
+description = "Camera control software for geotechnical research applications."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: POSIX :: Linux",
+]
+
+dependencies = [
+    "numpy==1.23.3",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/sas229/geocam"
+"Bug Tracker" = "https://github.com/sas229/geocam/issues"
+
+# [tool.cibuildwheel]
+# skip = "pp*" # Disable building PyPy wheels on all platforms.
