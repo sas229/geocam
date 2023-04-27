@@ -4,12 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+
+[dev-packages]
+build = "*"
+twine = "*"
 sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
-
-[dev-packages]
 
 [requires]
 python_version = "3.10"
