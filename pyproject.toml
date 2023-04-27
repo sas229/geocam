@@ -2,9 +2,6 @@
 requires = [
     "setuptools",
     "wheel",
-    "scikit-build",
-    "cmake",
-    "ninja"
 ]
 build-backend = "setuptools.build_meta"
 
@@ -33,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/sas229/geocam"
+"Homepage" = "https://github.com/sas229/geoca
 "Bug Tracker" = "https://github.com/sas229/geocam/issues"
 
 # [tool.cibuildwheel]
