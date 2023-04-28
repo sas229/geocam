@@ -3,6 +3,7 @@ class Controller:
     def __init__(self):
         print("Created a Controller instance.")
 
+
     def check_available_network_interfaces(self):
         """
         - Should check the type of network - and if a connection to internet is available or not
