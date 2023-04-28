@@ -1,17 +1,17 @@
 import socket 
 import struct
 import json 
-
+import platform
+import subprocess
+import os
 
 # Needs to be changed: tcp_link, 
 
 class Communicator(): 
 
     def __init__(self, device:str = 'controller', rig:str = 'txc1',  mcast_grp:str = '224.1.1.1', mcast_port:int = 9998, tcp_port:int = 47822): 
-
         print("Created a Communicator instance.")
-
-
+        
         # constants - given byt he user 
         self.rig = rig
         self.mcast_grp = mcast_grp
@@ -41,12 +41,79 @@ class Communicator():
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
         return sock_udp
     
-    def ping(self): 
+    def ping(self, host: str) -> bool:
         """
-        - Send a ping on the lan
+
+        Classical ping function - modified to not print the results in terminal
+
+        Parameters
+        ----------
+        host : str
+            ip address to ping - can be a website name
+
+        Returns
+        -------
+        bool
+            True if the ip is reached - False if not
         """
-        return
+        param += '-n' if platform.system().lower()=='windows' else '-c'
+        try:
+            subprocess.check_output(["ping", param, "1", host], stderr=subprocess.STDOUT)
+            return True
+        except subprocess.CalledProcessError:
+            return False
         
+    def get_host_ip(self) -> str:
+        """
+        
+        Function to get the IPv4 address of a device
+
+        Returns
+        -------
+        str
+            host ip address
+        """
+        if platform.system().lower() == 'windows':
+            return socket.gethostbyname(socket.gethostname())
+        else: 
+            routes = json.loads(os.popen("ip -j -4 route").read())
+            for r in routes:
+                if r.get("dev") == "wlan0" and r.get("prefsrc"):
+                    host_ip = r['prefsrc']
+                    continue
+            return host_ip 
+        
+    def network_status(self) -> str:
+        """
+        
+        3 status possible: 
+        - status_1: the device is connected to internet 
+        - status_2: the device is not connected to any kind of network 
+        - status_3: the device is connected either to a LAN or WLAN 
+
+        Returns
+        -------
+        str
+            status 1, 2 or 3 - see above 
+
+        Remark
+        ------
+        Note that having a virtualization software on the machine might simulate a LAN
+
+        """
+
+        host_ip = self.get_host_ip()
+        is_internet_connected = self.ping('google.com')
+
+        if is_internet_connected: 
+            return "status_1"
+        
+        elif host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
+            return "status_2"
+        
+        else: 
+            return "status_3" 
+            
     def _create_json(self): 
         """
         - Will be used to create JSON files
