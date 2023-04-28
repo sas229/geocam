@@ -161,3 +161,4 @@ cython_debug/
 
 # Folders.
 /docs/build
+/src/geocam/drafts
