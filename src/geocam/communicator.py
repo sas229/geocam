@@ -4,6 +4,7 @@ import json
 import platform
 import subprocess
 import os
+import warnings
 
 # Needs to be changed: tcp_link, 
 
@@ -19,8 +20,7 @@ class Communicator():
         self.tcp_port = tcp_port
 
         # constants - generated
-        self.hostname = socket.gethostname()
-        self.ipaddr = socket.gethostbyname(self.hostname)
+        self.ip_address:str = self.get_host_ip()
 
     def tcp_link(self): 
         """
@@ -28,7 +28,7 @@ class Communicator():
         - This will then either run as a client or server 
         """
         sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_tcp.bind((self.ipaddr, self.tcp_port))
+        sock_tcp.bind((self.ip_address, self.tcp_port))
         return sock_tcp
     
     def udp_multicast_link(self): # no sure if it works 
@@ -41,6 +41,18 @@ class Communicator():
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
         return sock_udp
     
+    def get_router_name(self):
+        # Get the hostname of the machine
+        hostname = socket.gethostname()
+        # Get the IP address associated with the hostname
+        ip_address = socket.gethostbyname(hostname)
+        # Get the router's IP address by removing the last digit of the IP address
+        router_ip_address = ".".join(ip_address.split(".")[:-1]) + ".1"
+        # Get the hostname associated with the router's IP address
+        router_hostname = socket.gethostbyaddr(router_ip_address)[0]
+        # Return the router's hostname
+        return router_hostname
+
     def ping(self, host: str) -> bool:
         """
 
@@ -56,7 +68,7 @@ class Communicator():
         bool
             True if the ip is reached - False if not
         """
-        param += '-n' if platform.system().lower()=='windows' else '-c'
+        param = '-n' if platform.system().lower()=='windows' else '-c'
         try:
             subprocess.check_output(["ping", param, "1", host], stderr=subprocess.STDOUT)
             return True
@@ -64,15 +76,14 @@ class Communicator():
             return False
         
     def get_host_ip(self) -> str:
-        """
-        
-        Function to get the IPv4 address of a device
+        """_summary_
+        Function to get the IP address of a device
 
         Returns
         -------
         str
-            host ip address
-        """
+            IP address of the device
+        """        
         if platform.system().lower() == 'windows':
             return socket.gethostbyname(socket.gethostname())
         else: 
@@ -83,42 +94,69 @@ class Communicator():
                     continue
             return host_ip 
         
-    def network_status(self) -> str:
-        """
+    def is_local_ip_address(self, host_ip:str) -> bool: 
+        if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
+            return True
+        else: 
+            return False 
         
+    def network_status(self, remote_server:str = "google.com"):
+        """_summary_
         3 status possible: 
-        - status_1: the device is connected to internet 
-        - status_2: the device is not connected to any kind of network 
-        - status_3: the device is connected either to a LAN or WLAN 
+        - status_1: the device is not on a network
+        - status_2: the device is on a network with no access to internet 
+        - status_3: the device is on a network with access to internet 
+
+        Parameters
+        ----------
+        remote_server : str, optional
+            Sexternal server that the device will try to reach to test the internet connection, 
+            by default "google.com"
+
+        Remark
+        -------
+        Having a virtualization software on the machine might simulate a LAN as these sofwares emulate a GegE 
+        """
+
+        is_local_ip_address = self.is_local_ip_address(self.get_host_ip())
+        is_internet_connected = self.ping(remote_server)
+
+        # status_1 : Warning : Not on a network
+        if not is_internet_connected and is_local_ip_address :
+            warnings.warn("This device isn't connected to a network", stacklevel=2)
+
+        # status_2 : Warning : No access to internet
+        elif not is_internet_connected and not is_local_ip_address: 
+            warnings.warn("No access to internet", stacklevel=2)
+            print(f"Connected to to a router with no access to internet")
+
+        # status_3 
+        elif is_internet_connected and not is_local_ip_address:
+            print(f"Connected to a router with access to internet")
+        
+        # undifined configuration
+        else:
+            print("Undifined - the ip is the local one but access to internet")
+            
+    def _create_json(self, command:str, arguments:str) -> str:
+        """_summary_
+
+        Parameters
+        ----------
+        command : str
+            _description_
+        arguments : str
+            _description_
 
         Returns
         -------
         str
-            status 1, 2 or 3 - see above 
+            string representing a JSON object
+        """      
+        _dict = {"command":command ,"arguments":arguments}
+        return json.dumps(_dict, indent=2)
+    
 
-        Remark
-        ------
-        Note that having a virtualization software on the machine might simulate a LAN
-
-        """
-
-        host_ip = self.get_host_ip()
-        is_internet_connected = self.ping('google.com')
-
-        if is_internet_connected: 
-            return "status_1"
-        
-        elif host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
-            return "status_2"
-        
-        else: 
-            return "status_3" 
-            
-    def _create_json(self): 
-        """
-        - Will be used to create JSON files
-        """
-        return 
 
 ## !! need to update the child classes    
 #############################################################################################################################################
@@ -130,43 +168,43 @@ class Sender(Communicator):
     Args:
         Communicator (_type_): _description_
     """
-    def __init__(self, device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822):
-        super().__init__(device, mcast_grp, mcast_port, tcp_port)
-        self.receivers = {}
-        self.sock_tcp = self.tcp_link()
+    # def __init__(self, device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822):
+    #     super().__init__(device, mcast_grp, mcast_port, tcp_port)
+    #     self.receivers = {}
+    #     self.sock_tcp = self.tcp_link()
 
-    def wait_for_answer_tcp(self): 
-        self.sock_tcp.listen()
-        number_of_found_receivers = len(self.receivers)
+    # def wait_for_answer_tcp(self): 
+    #     self.sock_tcp.listen()
+    #     number_of_found_receivers = len(self.receivers)
 
-        try: 
-            while number_of_found_receivers != self.number_of_receivers:        
-                # event loop waiting for connection 
-                while True:
-                    conn, addr = self.sock_tcp.accept()
-                    if conn: 
-                        data = conn.recv(1024)
-                        parsed_data = json.loads(data)
-                        # print(f"received data:\n {json.dumps(parsed_data, indent=2)}")
+    #     try: 
+    #         while number_of_found_receivers != self.number_of_receivers:        
+    #             # event loop waiting for connection 
+    #             while True:
+    #                 conn, addr = self.sock_tcp.accept()
+    #                 if conn: 
+    #                     data = conn.recv(1024)
+    #                     parsed_data = json.loads(data)
+    #                     # print(f"received data:\n {json.dumps(parsed_data, indent=2)}")
 
-                        dict_of_ip_addr_and_macaddr = parsed_data["content"]
-                        name_of_the_raspberrypi = parsed_data["content"]["hostname"]
-                        print(f'{name_of_the_raspberrypi} found at {addr}')
+    #                     dict_of_ip_addr_and_macaddr = parsed_data["content"]
+    #                     name_of_the_raspberrypi = parsed_data["content"]["hostname"]
+    #                     print(f'{name_of_the_raspberrypi} found at {addr}')
 
-                        # updates
-                        number_of_found_rpi += 1
-                        rpi_dict = {name_of_the_raspberrypi:dict((key, dict_of_ip_addr_and_macaddr[key]) for key in ('ip_addr', 'mac_addr'))}
-                        self.rpis_ids.update(rpi_dict)
+    #                     # updates
+    #                     number_of_found_rpi += 1
+    #                     rpi_dict = {name_of_the_raspberrypi:dict((key, dict_of_ip_addr_and_macaddr[key]) for key in ('ip_addr', 'mac_addr'))}
+    #                     self.rpis_ids.update(rpi_dict)
 
-                        # finishing up 
-                        conn.close()
-                        break
+    #                     # finishing up 
+    #                     conn.close()
+    #                     break
 
-            # closing the tcp socket         
-            sock_tcp.close() 
+    #         # closing the tcp socket         
+    #         sock_tcp.close() 
  
-        except Exception: 
-            print("still to be coded")
+        # except Exception: 
+        #     print("still to be coded")
 
 
 

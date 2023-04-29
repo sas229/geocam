@@ -5,13 +5,8 @@ class Controller:
     def __init__(self):
         print("Created a Controller instance.")
         com = communicator.Communicator()
-        network_status = com.network_status()
-        if network_status == "status_1": 
-            print("Device connected to internet")
-        elif network_status == "status_3":  
-            print("Device not connected to internet but on either a LAN or WLAN")
-        else: 
-            print("Device not connected to any kind of network")
+        com.network_status()
+
 
     def check_available_network_interfaces(self):
         """
