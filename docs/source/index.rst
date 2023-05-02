@@ -8,9 +8,22 @@ Welcome to geocam's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Usage:
 
-   modules
+   installation
+   bibliography
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Theory:
+
+   sectionAboutTheory
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Package structure:
+
+   geocam
 
 Indices and tables
 ==================

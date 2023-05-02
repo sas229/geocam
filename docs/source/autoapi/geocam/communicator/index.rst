@@ -1,9 +1,13 @@
-:orphan:
-
 :py:mod:`geocam.communicator`
 =============================
 
 .. py:module:: geocam.communicator
+
+.. autoapi-nested-parse::
+
+   This module is used for the various communication operations
+
+
 
 
 Module Contents
@@ -46,7 +50,7 @@ Classes
    :type Communicator: _type_
 
 
-.. py:class:: Sender(device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822)
+.. py:class:: Sender(device: str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822)
 
    Bases: :py:obj:`Communicator`
 

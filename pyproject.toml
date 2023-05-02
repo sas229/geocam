@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/sas229/geoca
+"Homepage" = "https://github.com/sas229/geocam"
 "Bug Tracker" = "https://github.com/sas229/geocam/issues"
 
 # [tool.cibuildwheel]

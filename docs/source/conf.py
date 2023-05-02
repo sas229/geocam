@@ -13,7 +13,7 @@
 import os
 import sys
 
-sys.path.append(os.path.abspath("../../src/geocam/"))
+sys.path.insert(0, os.path.abspath(r"../../src/"))
 
 # -- Project information -----------------------------------------------------
 
@@ -38,7 +38,8 @@ extensions = [
     "sphinx_copybutton",
     "sphinxcontrib.bibtex",
     "sphinx.ext.todo",
-    "sphinx.ext.intersphinx"
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.autodoc"
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -107,3 +108,4 @@ myst_url_schemes = [
     "http",
     "https",
 ]
+
