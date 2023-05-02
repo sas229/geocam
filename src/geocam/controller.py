@@ -7,7 +7,6 @@ class Controller:
         com = communicator.Communicator()
         com.network_status()
 
-
     def check_available_network_interfaces(self):
         """
         - Should check the type of network - and if a connection to internet is available or not

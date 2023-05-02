@@ -22,7 +22,7 @@ class Communicator():
         # constants - generated
         self.ip_address:str = self.get_host_ip()
 
-    def tcp_link(self): 
+    def tcp_ip_socket(self) -> socket.socket: 
         """
         - Create a tcp link for communication
         - This will then either run as a client or server 
@@ -31,7 +31,7 @@ class Communicator():
         sock_tcp.bind((self.ip_address, self.tcp_port))
         return sock_tcp
     
-    def udp_multicast_link(self): # no sure if it works 
+    def udp_multicast_socket(self) -> socket.socket: # no sure if it works 
         """
         - Create a tcp link for communication
         - This will then either run as a client or server 
@@ -40,34 +40,20 @@ class Communicator():
         ttl = struct.pack('b', 1)
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
         return sock_udp
-    
-    def get_router_name(self):
-        # Get the hostname of the machine
-        hostname = socket.gethostname()
-        # Get the IP address associated with the hostname
-        ip_address = socket.gethostbyname(hostname)
-        # Get the router's IP address by removing the last digit of the IP address
-        router_ip_address = ".".join(ip_address.split(".")[:-1]) + ".1"
-        # Get the hostname associated with the router's IP address
-        router_hostname = socket.gethostbyaddr(router_ip_address)[0]
-        # Return the router's hostname
-        return router_hostname
 
     def ping(self, host: str) -> bool:
-        """
-
-        Classical ping function - modified to not print the results in terminal
+        """_summary_
 
         Parameters
         ----------
         host : str
-            ip address to ping - can be a website name
+            _description_
 
         Returns
         -------
         bool
-            True if the ip is reached - False if not
-        """
+            _description_
+        """        
         param = '-n' if platform.system().lower()=='windows' else '-c'
         try:
             subprocess.check_output(["ping", param, "1", host], stderr=subprocess.STDOUT)
@@ -95,6 +81,18 @@ class Communicator():
             return host_ip 
         
     def is_local_ip_address(self, host_ip:str) -> bool: 
+        """_summary_
+
+        Parameters
+        ----------
+        host_ip : str
+            _description_
+
+        Returns
+        -------
+        bool
+            _description_
+        """        
         if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
             return True
         else: 
@@ -128,11 +126,10 @@ class Communicator():
         # status_2 : Warning : No access to internet
         elif not is_internet_connected and not is_local_ip_address: 
             warnings.warn("No access to internet", stacklevel=2)
-            print(f"Connected to to a router with no access to internet")
 
         # status_3 
         elif is_internet_connected and not is_local_ip_address:
-            print(f"Connected to a router with access to internet")
+            warnings.warn("Access to internet", stacklevel=2)
         
         # undifined configuration
         else:
@@ -155,7 +152,6 @@ class Communicator():
         """      
         _dict = {"command":command ,"arguments":arguments}
         return json.dumps(_dict, indent=2)
-    
 
 
 ## !! need to update the child classes    
