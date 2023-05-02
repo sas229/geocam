@@ -1,3 +1,10 @@
+"""
+
+This module is used for the various communication operations
+
+
+"""
+
 import socket 
 import struct
 import json 

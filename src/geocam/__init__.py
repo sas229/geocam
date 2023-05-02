@@ -1,4 +1,4 @@
-import calibrator 
-import controller 
-import communicator 
-import rpicamera 
+import geocam.calibrator 
+import geocam.controller 
+import geocam.communicator 
+import geocam.rpicamera 

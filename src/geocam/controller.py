@@ -1,4 +1,11 @@
-import communicator 
+"""
+
+This module is used for control of the rigs 
+
+
+"""
+
+from geocam import communicator 
 
 class Controller:
 

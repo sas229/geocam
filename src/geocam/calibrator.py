@@ -1,3 +1,9 @@
+"""
+
+This module is used for the various calibration operations
+
+
+"""
 class Calibrator(): 
 
     def __init__(self): 
@@ -5,8 +11,7 @@ class Calibrator():
 
     def focus(self):
         """
-        - Start the focus sequence
-        - Will call stream in communicator 
+        Start the focus sequenceWill call stream in communicator 
         """ 
         return
     

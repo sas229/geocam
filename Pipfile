@@ -13,6 +13,8 @@ sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
 colorama = "*"
+geocam = {editable = true, path = '.'}
+sphinx = "*"
 
 [requires]
 python_version = "3.10"
