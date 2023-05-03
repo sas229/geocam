@@ -11,6 +11,7 @@ Welcome to geocam's documentation!
    :caption: Usage:
 
    installation
+   examples
    bibliography
 
 .. toctree::
@@ -18,6 +19,12 @@ Welcome to geocam's documentation!
    :caption: Theory:
 
    sectionAboutTheory
+
+.. toctree::
+   :maxdepth: 2
+   :caption: General:
+
+   questions
 
 .. toctree::
    :maxdepth: 2
