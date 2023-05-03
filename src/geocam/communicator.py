@@ -35,18 +35,6 @@ class Communicator():
         # constants - generated
         self.ip_address:str = self.get_host_ip()
 
-    def tcp_ip_socket(self) -> socket.socket: 
-        """This method creates a socket for TCP/IP communication
-
-        Returns
-        -------
-        socket.socket
-            TCP socket
-        """
-        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock_tcp.bind((self.ip_address, self.tcp_port))
-        return sock_tcp
-
     def ping(self, host: str) -> bool:
         """This method is used to ping the network
 
