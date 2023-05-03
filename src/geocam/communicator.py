@@ -1,7 +1,9 @@
 """
-
-This module is used for the various communication operations
-
+:Name: communicator
+:Description: This module is used for the various communication operations
+:Date: 2023-05-03
+:Version: 0.0.1
+:Author(s): Hilario Greggi, Sam Stanier, Zewen Wang, Wenhan Du, Barry Lehane
 
 """
 
@@ -12,54 +14,51 @@ import platform
 import subprocess
 import os
 import warnings
+import time
+import traceback
 
-# Needs to be changed: tcp_link, 
+#############################################################################################################################################
+## MAIN CLASS ###############################################################################################################################
+############################################################################################################################################# 
 
 class Communicator(): 
 
-    def __init__(self, device:str = 'controller', rig:str = 'txc1',  mcast_grp:str = '224.1.1.1', mcast_port:int = 9998, tcp_port:int = 47822): 
+    def __init__(self, device:str = 'controller', rig:str = 'txc1',  mcast_grp:str = '224.1.1.1', mcast_port:int = 9998, tcp_port:int = 47822) -> None: 
         print("Created a Communicator instance.")
         
         # constants - given byt he user 
-        self.rig = rig
-        self.mcast_grp = mcast_grp
-        self.mcast_port = mcast_port
-        self.tcp_port = tcp_port
+        self.rig:str = rig
+        self.mcast_grp:str = mcast_grp
+        self.mcast_port:int = mcast_port
+        self.tcp_port:int = tcp_port
 
         # constants - generated
         self.ip_address:str = self.get_host_ip()
 
     def tcp_ip_socket(self) -> socket.socket: 
-        """
-        - Create a tcp link for communication
-        - This will then either run as a client or server 
+        """This method creates a socket for TCP/IP communication
+
+        Returns
+        -------
+        socket.socket
+            TCP socket
         """
         sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock_tcp.bind((self.ip_address, self.tcp_port))
         return sock_tcp
-    
-    def udp_multicast_socket(self) -> socket.socket: # no sure if it works 
-        """
-        - Create a tcp link for communication
-        - This will then either run as a client or server 
-        """
-        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        ttl = struct.pack('b', 1)
-        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
-        return sock_udp
 
     def ping(self, host: str) -> bool:
-        """_summary_
+        """This method is used to ping the network
 
         Parameters
         ----------
         host : str
-            _description_
+            Host to ping 
 
         Returns
         -------
         bool
-            _description_
+            True if we have an answer or False if no answer
         """        
         param = '-n' if platform.system().lower()=='windows' else '-c'
         try:
@@ -69,13 +68,12 @@ class Communicator():
             return False
         
     def get_host_ip(self) -> str:
-        """_summary_
-        Function to get the IP address of a device
+        """Gets the host IP address
 
         Returns
         -------
         str
-            IP address of the device
+            IP address
         """        
         if platform.system().lower() == 'windows':
             return socket.gethostbyname(socket.gethostname())
@@ -101,6 +99,7 @@ class Communicator():
             _description_
         """        
         if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
+            print("host_ip", host_ip)
             return True
         else: 
             return False 
@@ -118,13 +117,12 @@ class Communicator():
             Sexternal server that the device will try to reach to test the internet connection, 
             by default "google.com"
 
-        Remark
-        -------
-        Having a virtualization software on the machine might simulate a LAN as these sofwares emulate a GegE 
         """
 
         is_local_ip_address = self.is_local_ip_address(self.get_host_ip())
         is_internet_connected = self.ping(remote_server)
+        print(is_local_ip_address)
+        print(is_internet_connected)
 
         # status_1 : Warning : Not on a network
         if not is_internet_connected and is_local_ip_address :
@@ -159,75 +157,131 @@ class Communicator():
         """      
         _dict = {"command":command ,"arguments":arguments}
         return json.dumps(_dict, indent=2)
-
-
-## !! need to update the child classes    
-#############################################################################################################################################
-    
-class Sender(Communicator):
-    """
-    - They should only be one type of sender: computers. 
-
-    Args:
-        Communicator (_type_): _description_
-    """
-    # def __init__(self, device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822):
-    #     super().__init__(device, mcast_grp, mcast_port, tcp_port)
-    #     self.receivers = {}
-    #     self.sock_tcp = self.tcp_link()
-
-    # def wait_for_answer_tcp(self): 
-    #     self.sock_tcp.listen()
-    #     number_of_found_receivers = len(self.receivers)
-
-    #     try: 
-    #         while number_of_found_receivers != self.number_of_receivers:        
-    #             # event loop waiting for connection 
-    #             while True:
-    #                 conn, addr = self.sock_tcp.accept()
-    #                 if conn: 
-    #                     data = conn.recv(1024)
-    #                     parsed_data = json.loads(data)
-    #                     # print(f"received data:\n {json.dumps(parsed_data, indent=2)}")
-
-    #                     dict_of_ip_addr_and_macaddr = parsed_data["content"]
-    #                     name_of_the_raspberrypi = parsed_data["content"]["hostname"]
-    #                     print(f'{name_of_the_raspberrypi} found at {addr}')
-
-    #                     # updates
-    #                     number_of_found_rpi += 1
-    #                     rpi_dict = {name_of_the_raspberrypi:dict((key, dict_of_ip_addr_and_macaddr[key]) for key in ('ip_addr', 'mac_addr'))}
-    #                     self.rpis_ids.update(rpi_dict)
-
-    #                     # finishing up 
-    #                     conn.close()
-    #                     break
-
-    #         # closing the tcp socket         
-    #         sock_tcp.close() 
  
-        # except Exception: 
-        #     print("still to be coded")
+#############################################################################################################################################
+## CHILD CLASSES ############################################################################################################################
+############################################################################################################################################# 
 
-
-
-class Receiver(Communicator): 
+class Sender(Communicator):
     """_summary_
 
-    Args:
-        Communicator (_type_): _description_
+    Parameters
+    ----------
+    Communicator : _type_
+        _description_
     """
-    def __init__(self, device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822):
-        super().__init__(device, mcast_grp, mcast_port, tcp_port)
+    def __init__(self, device:str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822) -> None:
+        """_summary_
 
-##############################################################################################################################################
-    
-class ListeningRPi(Receiver): 
-    def __init__(self, device: str = 'controller', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822):
-        super().__init__(device, mcast_grp, mcast_port, tcp_port)
+        Parameters
+        ----------
+        device : str, optional
+            _description_, by default 'controller'
+        rig : str, optional
+            _description_, by default 'txc1'
+        mcast_grp : str, optional
+            _description_, by default '224.1.1.1'
+        mcast_port : int, optional
+            _description_, by default 9998
+        tcp_port : int, optional
+            _description_, by default 47822
+        """
+        super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
 
-    def stream(self): 
+    def send_to_all(self, message:str) -> None:
+        """_summary_
+
+        Parameters
+        ----------
+        message : _type_
+            _description_
         """
-        - Stream video to a ip address
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        self.ttl = struct.pack('b', 1)
+        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
+        sock_udp.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
+        print(f"{message} sent on broadcast channel")
+
+    def send_to_one(self, target_ip:str, message:str) -> None:
+        """_summary_
+
+        Parameters
+        ----------
+        target_ip : str
+            _description_
+        message : str
+            _description_
         """
-        return
+        target_address = (target_ip, self.tcp_port)
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try: 
+                    s.connect(target_address)
+                except ConnectionRefusedError:
+                    print("Connection refused, retrying in 2 seconds...")
+                    time.sleep(2)
+                    continue
+                s.sendall(bytes(message, 'utf-8'))
+            break 
+        print(f"{message} sent to {target_address}")
+
+class Receiver(Communicator):
+    """_summary_
+
+    Parameters
+    ----------
+    Communicator : _type_
+        _description_
+    """
+    def __init__(self, device: str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822) -> None:
+        super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
+
+    def listen_for_brodcast_on(self) -> str:
+        """_summary_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        sock_udp.bind(('', self.mcast_port))
+        mreq = struct.pack("4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
+        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        print(f"Standing by on mcast_grp:{self.mcast_grp} | mcast_port:{self.mcast_port}")
+        
+        try: 
+            while True:
+                data, addr = sock_udp.recvfrom(1024)
+                print(f"Received data {data}")
+        
+        except Exception:
+            traceback.print_exc()
+            sock_udp.close()
+        
+        return data
+
+    def listen_to_one(self) -> str:
+        """_summary_
+
+        Returns
+        -------
+        str
+            _description_
+        """
+        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock_tcp.bind((self.ipaddr, self.tcp_port))
+        sock_tcp.listen()
+
+        try:
+            while True:
+                conn, addr = sock_tcp.accept()
+                if conn: 
+                    data = conn.recv(1024)
+                
+        except Exception:
+            traceback.print_exc()
+            sock_tcp.close()
+
+        return data
