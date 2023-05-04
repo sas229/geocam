@@ -20,7 +20,8 @@ import getmac
 
 #############################################################################################################################################
 ## MAIN CLASS ###############################################################################################################################
-############################################################################################################################################# 
+#############################################################################################################################################
+
 
 class Communicator(): 
 
@@ -35,31 +36,14 @@ class Communicator():
 
         # constants - generated
         self.ipaddr:str = self.get_host_ip()
-
-    def ping(self, host: str) -> bool:
-        """This method is used to ping the network
-
-        Parameters
-        ----------
-        host : str
-            Host to ping 
-
-        Returns
-        -------
-        bool
-            True if we have an answer or False if no answer
-        """        
-        param = '-n' if platform.system().lower()=='windows' else '-c'
-        try:
-            subprocess.check_output(["ping", param, "1", host], stderr=subprocess.STDOUT)
-            return True
-        except subprocess.CalledProcessError:
-            return False
+        self.hostname:str = self.get_host_name()
+        self.macaddr:str = self.get_mac_address()
+        # could be interesting to get the name of the router ..
 
 #############################################################################################################################################
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-
+## Get informations on machine ##############################################################################################################
+############################################################################################################################################# 
+ 
     def get_host_name(self) -> str: 
         """No very useful but might become useful, if not discard it
 
@@ -69,11 +53,6 @@ class Communicator():
             _description_
         """
         return socket.gethostname()
-    
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
-#############################################################################################################################################
-
         
     def get_host_ip(self) -> str:
         """Gets the host IP address
@@ -95,6 +74,30 @@ class Communicator():
         
     def get_mac_address(self) -> str:
         return getmac.get_mac_address()
+    
+#############################################################################################################################################
+## Network diagnostic #######################################################################################################################
+############################################################################################################################################# 
+    
+    def ping(self, host:str) -> bool:
+        """This method is used to ping the network
+
+        Parameters
+        ----------
+        host : str
+            Host to ping 
+
+        Returns
+        -------
+        bool
+            True if we have an answer or False if no answer
+        """        
+        param = '-n' if platform.system().lower()=='windows' else '-c'
+        try:
+            subprocess.check_output(["ping", param, "1", host], stderr=subprocess.STDOUT)
+            return True
+        except subprocess.CalledProcessError:
+            return False
         
     def is_local_ip_address(self, host_ip:str) -> bool: 
         """_summary_
@@ -147,6 +150,9 @@ class Communicator():
         # undifined configuration
         else:
             print("Undifined - the ip is the local one but access to internet")
+
+## Messages bundle ##########################################################################################################################
+############################################################################################################################################# 
             
     def _create_json(self, command:str, arguments:str) -> str:
         """_summary_
@@ -181,10 +187,11 @@ class Communicator():
         """
         return json.loads(json_string)
         
- 
+
 #############################################################################################################################################
 ## CHILD CLASSES ############################################################################################################################
-############################################################################################################################################# 
+#############################################################################################################################################
+
 
 class Sender(Communicator):
     """_summary_
@@ -235,11 +242,6 @@ class Sender(Communicator):
 
         print(f"{message} sent on broadcast channel")
 
-    # VERSION 1 FUNC TO SEND ON A SPEFIC ADDRESS IN THE MCAST GROUP - typically rpi to controller sending a response to registration
-
-    def send_on_mcastgrp(self, message:bytes, addr:str) -> None:
-        
-
     # VERSION 1 FUNC TO SEND INFO TO ONE MEMBER VIA TCP/IP
 
     def send_to_one(self, target_ip:str, message:str) -> None:
@@ -265,10 +267,6 @@ class Sender(Communicator):
             break 
         print(f"{message} sent to {target_address}")
 
-#############################################################################################################################################
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-
     # VERSION 2 FUNC TO SEND INFO TO ALL MEMBERS OF THE MCCASTGRP : new name send_on_mcastgrp old name send_to_all
 
     def send_on_mcastgrp(self, message:str) -> None:
@@ -286,11 +284,6 @@ class Sender(Communicator):
             s.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
 
         print(f"{message} sent on broadcast channel")
-
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
-#############################################################################################################################################
-
 
 class Receiver(Communicator):
     """_summary_
@@ -515,7 +508,94 @@ class Receiver(Communicator):
                 data = conn.recv(1024)
                 print(f"Received data {data}")
                 return data 
-        
+
+#############################################################################################################################################
+####################################################"""IN PROGRESS NOW"""####################################################################
+#############################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!###########################################################
+#############################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#################################
+############!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!###################
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+
+class UDP_multicast(Communicator):
+
+    def __init__(self, device: str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822) -> None:
+        super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
+
+    ### used by the sender
+    # setup the udp socket 
+    def sender(self, timeout:int = 10) -> socket.socket: # check if the timeout is required or not  
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        ttl = struct.pack('b', 1)
+        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        return sock_udp  
+
+    # send data 
+    # use the preexsiting sendto method of socket
+
+    ### used by the receiver
+    # setup the udp socket
+    def receiver(self) -> socket.socket: # check if the timeout is required or not  
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        sock_udp.bind(('', self.mcast_port))
+        mreq = struct.pack("4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
+        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        print(f"Standing by on mcast_grp:{self.mcast_grp}, mcast_port:{self.mcast_port}")
+        return sock_udp 
+    
+    # receive data 
+    # this function is not join to the previous to allow us to write different function that uses the receive function 
+    def receive(self, sock_udp:socket.socket, timeout:int = 10) -> tuple: 
+        sock_udp.settimeout(timeout)
+        while True:
+            data, addr = sock_udp.recvfrom(1024)
+            return data, addr
+
+class TCP_ip(Communicator):
+
+    def __init__(self, device: str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822) -> None:
+        super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
+
+    # used by the sender
+    def send(self, target_ip:str, message) -> socket.socket: 
+        server_address = (target_ip, self.tcp_port)
+        while True:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try: 
+                    s.connect(server_address)
+                except ConnectionRefusedError:
+                    print("Connection refused, retrying in 2 seconds...")
+                    time.sleep(2)
+                    continue
+                s.sendall(bytes(message, 'utf-8'))
+            break 
+
+    # used by the receiver 
+    def receiver(self, timeout:int = 10) -> socket.socket: # check if the timeout is required or not 
+        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock_tcp.bind((self.ipaddr, self.tcp_port))
+        sock_tcp.listen()
+        return sock_tcp
+    
+    def receive(self, sock_tcp:socket.socket, timeout:int = 10) -> tuple:
+        sock_tcp.settimeout(timeout)
+        while True:
+            conn, addr = sock_tcp.accept()
+            if conn: 
+                data = conn.recv(1024)
+                return data, addr
+
+
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+############!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!####################
+#############################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#################################
+#############################################!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!###########################################################
+####################################################"""IN PROGRESS NOW"""####################################################################
+#############################################################################################################################################
+  
+      
+
+
 
 #############################################################################################################################################
 ## IN PROGRESS ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##############
