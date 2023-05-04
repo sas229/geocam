@@ -16,6 +16,7 @@ import os
 import warnings
 import time
 import traceback
+import getmac
 
 #############################################################################################################################################
 ## MAIN CLASS ###############################################################################################################################
@@ -33,7 +34,7 @@ class Communicator():
         self.tcp_port:int = tcp_port
 
         # constants - generated
-        self.ip_address:str = self.get_host_ip()
+        self.ipaddr:str = self.get_host_ip()
 
     def ping(self, host: str) -> bool:
         """This method is used to ping the network
@@ -54,6 +55,25 @@ class Communicator():
             return True
         except subprocess.CalledProcessError:
             return False
+
+#############################################################################################################################################
+## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+
+    def get_host_name(self) -> str: 
+        """No very useful but might become useful, if not discard it
+
+        Returns
+        -------
+        str
+            _description_
+        """
+        return socket.gethostname()
+    
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
+#############################################################################################################################################
+
         
     def get_host_ip(self) -> str:
         """Gets the host IP address
@@ -73,6 +93,9 @@ class Communicator():
                     continue
             return host_ip 
         
+    def get_mac_address(self) -> str:
+        return getmac.get_mac_address()
+        
     def is_local_ip_address(self, host_ip:str) -> bool: 
         """_summary_
 
@@ -87,7 +110,6 @@ class Communicator():
             _description_
         """        
         if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
-            print("host_ip", host_ip)
             return True
         else: 
             return False 
@@ -109,8 +131,6 @@ class Communicator():
 
         is_local_ip_address = self.is_local_ip_address(self.get_host_ip())
         is_internet_connected = self.ping(remote_server)
-        print(is_local_ip_address)
-        print(is_internet_connected)
 
         # status_1 : Warning : Not on a network
         if not is_internet_connected and is_local_ip_address :
@@ -120,7 +140,7 @@ class Communicator():
         elif not is_internet_connected and not is_local_ip_address: 
             warnings.warn("No access to internet", stacklevel=2)
 
-        # status_3 
+        # status_3 : Warning : Access to internet
         elif is_internet_connected and not is_local_ip_address:
             warnings.warn("Access to internet", stacklevel=2)
         
@@ -145,6 +165,22 @@ class Communicator():
         """      
         _dict = {"command":command ,"arguments":arguments}
         return json.dumps(_dict, indent=2)
+
+    def _read_json(self, json_string:str) -> dict: 
+        """Don't do much for now but might become usefull later
+
+        Parameters
+        ----------
+        json_string : str
+            _description_
+
+        Returns
+        -------
+        dict
+            _description_
+        """
+        return json.loads(json_string)
+        
  
 #############################################################################################################################################
 ## CHILD CLASSES ############################################################################################################################
@@ -175,8 +211,16 @@ class Sender(Communicator):
             _description_, by default 47822
         """
         super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
+        print("--> Child Class: Sender instance")
+
+#############################################################################################################################################
+## IN PROGRESS ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##############
+############################################################################################################################################# 
+
+    # VERSION 1 FUNC TO SEND INFO TO ALL MEMBERS OF THE MCCASTGRP - used by the controller
 
     def send_to_all(self, message:str) -> None:
+        print("[send_to_all]")
         """_summary_
 
         Parameters
@@ -184,11 +228,19 @@ class Sender(Communicator):
         message : _type_
             _description_
         """
-        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        self.ttl = struct.pack('b', 1)
-        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, self.ttl)
-        sock_udp.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
+            ttl = struct.pack('b', 1)
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+            s.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
+
         print(f"{message} sent on broadcast channel")
+
+    # VERSION 1 FUNC TO SEND ON A SPEFIC ADDRESS IN THE MCAST GROUP - typically rpi to controller sending a response to registration
+
+    def send_on_mcastgrp(self, message:bytes, addr:str) -> None:
+        
+
+    # VERSION 1 FUNC TO SEND INFO TO ONE MEMBER VIA TCP/IP
 
     def send_to_one(self, target_ip:str, message:str) -> None:
         """_summary_
@@ -213,6 +265,33 @@ class Sender(Communicator):
             break 
         print(f"{message} sent to {target_address}")
 
+#############################################################################################################################################
+## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+
+    # VERSION 2 FUNC TO SEND INFO TO ALL MEMBERS OF THE MCCASTGRP : new name send_on_mcastgrp old name send_to_all
+
+    def send_on_mcastgrp(self, message:str) -> None:
+        print("[send_to_all]")
+        """_summary_
+
+        Parameters
+        ----------
+        message : _type_
+            _description_
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
+            ttl = struct.pack('b', 1)
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+            s.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
+
+        print(f"{message} sent on broadcast channel")
+
+###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
+## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
+#############################################################################################################################################
+
+
 class Receiver(Communicator):
     """_summary_
 
@@ -223,8 +302,11 @@ class Receiver(Communicator):
     """
     def __init__(self, device: str = 'controller', rig: str = 'txc1', mcast_grp: str = '224.1.1.1', mcast_port: int = 9998, tcp_port: int = 47822) -> None:
         super().__init__(device, rig, mcast_grp, mcast_port, tcp_port)
+        print("--> Child Class: Receiver instance")
 
-    def listen_for_brodcast_on(self) -> str:
+    # VERSION 1 FUNC TO LISTEN TO ALL MEMBERS OF THE MCCASTGRP
+
+    def listen_for_broadcast(self, timeout = 3) -> str: # WILL DISAPPEAR
         """_summary_
 
         Returns
@@ -232,25 +314,136 @@ class Receiver(Communicator):
         _type_
             _description_
         """
+        print("[listen_for_broadcast]")
         sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
         sock_udp.bind(('', self.mcast_port))
         mreq = struct.pack("4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        print(f"Standing by on mcast_grp:{self.mcast_grp} | mcast_port:{self.mcast_port}")
+        print(f"Standing by on mcast_grp:{self.mcast_grp}, mcast_port:{self.mcast_port}")
+        sock_udp.settimeout(timeout)
         
+        counter = 0
         try: 
             while True:
                 data, addr = sock_udp.recvfrom(1024)
+                counter += 1
                 print(f"Received data {data}")
+                return data 
         
+        except TimeoutError:
+            print(f"Waited {timeout} s and no responce")
+
         except Exception:
             traceback.print_exc()
-            sock_udp.close()
         
-        return data
+        finally: 
+            sock_udp.close()
+            if counter == 0:
+                print(f"No rpis found")
+            else:
+                print(f"Found {counter} rpis")
+            return counter
+        
+    # VERSION 2 FUNC TO LISTEN TO ALL MEMBERS OF THE MCCASTGRP: NOW TWO FUNCS 
 
-    def listen_to_one(self) -> str:
+    # FIRST TO CREATE THE SOCKET 
+        
+    def socket_for_broadcast_listenning(self, timeout:float = 3) -> socket.socket:
+        sock_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
+        sock_udp.bind(('', self.mcast_port))
+        mreq = struct.pack("4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
+        sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        print(f"Standing by on mcast_grp:{self.mcast_grp}, mcast_port:{self.mcast_port}")
+        
+        return sock_udp 
+    
+    # SECOND TO COUNT THE MEMBERS 
+
+    def count_member_of_mcastgrp(self, sock_udp:socket.socket, timeout:int = 3) -> int: # WILL DISAPPEAR
+        # what will happen with the returns ? 
+        number_of_members = 0
+        with sock_udp as s:
+            s.settimeout(timeout) 
+            try: 
+                while True:
+                    data, addr = s.recvfrom(1024)
+                    number_of_members += 1
+                    print(f"Received data {data}")
+                    return data 
+            
+            except TimeoutError:
+                print(f"Waited {timeout} s and no responce")
+
+            except Exception:
+                traceback.print_exc()
+            
+            finally: 
+                print(f"No rpis found") if number_of_members == 0 else print(f"Found {number_of_members} rpis")
+                return number_of_members
+
+    # VERSION 3 FUNC TO LISTEN TO ALL MEMBERS OF THE MCASTGRP: THREE FUNCTIONS WITH ONE IN CONTROLLER: SEE count_member_of_mcastgrp
+
+    # FIRST ONE REMAINS: socket_for_broadcast_listenning
+
+    # SECOND ONE IN CONTROLLER: count_member_of_mcastgrp2 : MODIFIED 
+
+    # THIRD ONE HERE: see here : listen_to_all
+
+    # it's the one that allows the most flexibility when using the communications functions. count_member_of_mcastgrp2 is only a example of how these functions can be used 
+
+    def listen_to_all(self, sock_tcp:socket.socket, timeout:float) -> int:
+        number_of_members = 0
+        while True:
+            data, addr = sock_tcp.recvfrom(1024)
+            number_of_members += 1
+            print(f"Received data {data}")
+            return number_of_members 
+        
+    # VERSION 4 FUNC TO LISTEN TO ALL MEMBERS OF THE MCASTGRP: THREE FUNCTIONS WITH ONE IN CONTROLLER: SEE count_member_of_mcastgrp
+
+    # FIRST ONE REMAINS: socket_for_broadcast_listenning
+
+    # SECOND ONE IN CONTROLLER: count_member_of_mcastgrp2 : MODIFIED 
+
+    # THIRD ONE HERE: see here : listen_to_all_members
+
+    # I realised something: 
+    # - issue one: the current code will get out of the while loop after the first member answers. this can be solved by relying on a timeout error to stop the process 
+    # - issue two: this fucntions as to be used for the registration process and the identification of the pis - it's not flexible enough as it is -> will have to write two  
+
+#############################################################################################################################################
+## NEEDS MODIFICATIONS ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%######
+###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########
+
+    def listen_to_all_members_for_registration(self, sock_udp:socket.socket, timeout:float) -> int:
+        # timeout shouldn't be too high
+        number_of_members = 0
+        addr = None
+        while True:
+            try:    
+                data, addr = sock_udp.recvfrom(1024)
+                if data:
+                    number_of_members += 1 
+            except TimeoutError:
+                break
+        return number_of_members 
+        
+    def get_requests(self, sock_udp:socket.socket, timeout:float = 20) -> bytes: # should have no timetout for later - keeping the timeout for dev
+        print(f"don't forget the timeout of {timeout}s, get rid of it")
+        while True:
+            data, addr = sock_udp.recvfrom(1024)
+            return data, addr
+
+###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%########
+## IN PROGRESS NOW ###%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%##########
+#############################################################################################################################################
+
+
+    # VERSION 1 FUNC TO LISTEN TO ALL MEMBERS FOR INCOMING TCP/IP REQUESTS   
+    
+    def listen_to_one(self) -> str: # WILL DISAPPEAR
         """_summary_
 
         Returns
@@ -258,6 +451,7 @@ class Receiver(Communicator):
         str
             _description_
         """
+        print("[listen_to_one]")
         sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock_tcp.bind((self.ipaddr, self.tcp_port))
         sock_tcp.listen()
@@ -273,3 +467,56 @@ class Receiver(Communicator):
             sock_tcp.close()
 
         return data
+    
+    # VERSION 2 FUNC TO LISTEN TO ALL MEMBERS FOR INCOMING TCP/IP REQUESTS: NOW TWO FUNCS
+    
+    # FIRST TO CREATE THE SOCKET 
+
+    def socket_for_one_to_one_listening(self) -> socket.socket:
+        sock_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock_tcp.bind((self.ipaddr, self.tcp_port))
+        sock_tcp.listen()
+        return sock_tcp 
+    
+    # SECOND TO ACCEPT INCOMING REQUESTS FOR CONNECTION
+    
+    def accept_response(self, sock_tcp:socket.socket, timeout:float = 10) -> None: # WILL DISAPPEAR
+        found_members = 0
+        with sock_tcp as s: 
+            try: 
+                while True:
+                    conn, addr = sock_tcp.accept()
+                    if conn: 
+                        data = conn.recv(1024)
+                        print(f"Received data {data}")
+                        found_members += 1
+                        return data 
+
+            except TimeoutError:
+                print(f"Waited {timeout} s and no responce")
+
+            except Exception:
+                traceback.print_exc()
+
+    # VERSION 3 FUNC TO LISTEN TO ALL MEMBERS FOR INCOMING TCP/IP REQUESTS: NOW THREE FUNCTIONS WITH ONE IN CONTROLLER: SEE get_ip_and_mac_addrr_of_the_members2
+
+    # FIRST ONE REMAINS: socket_for_one_to_one_listening
+
+    # SECOND ONE IN CONTROLLER: get_ip_and_mac_addrr_of_the_members2 : MODIFIED 
+
+    # THIRD ONE HERE: see here : listen_to_one2
+
+    # FINAL VERSION: it's the one that allows the most flexibility when using the communications functions. get_ip_and_mac_addrr_of_the_members2 is only a example of how these functions can be used 
+
+    def listen_to_one2(self, sock_tcp:socket.socket, timeout:float) -> bytes:
+        while True:
+            conn, addr = sock_tcp.accept()
+            if conn: 
+                data = conn.recv(1024)
+                print(f"Received data {data}")
+                return data 
+        
+
+#############################################################################################################################################
+## IN PROGRESS ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##############
+#############################################################################################################################################
