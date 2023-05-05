@@ -56,7 +56,7 @@ class RPicamera():
                     event_time = time.time()
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
-                    break
+                break
     
     def excecute(self, request:dict, addr:str, socket_udp:communicator.CustomSocket, print_info:bool = True) -> None:
         #TODO: add some asserts to check if the sockets sockets to send info 
@@ -77,11 +77,12 @@ class RPicamera():
             # check 2 plateform name 
             check2 = platform.system() == arguments["plateform"]
             # check 3 prefix of hostname 
-            check3 = communicator.get_host_name() == arguments["prefix"].startswith("rp")
+            check3 = communicator.get_host_name().startswith(arguments["prefix"])
             # bundle the checks in a list
             checks = [check1, check2, check3] 
             if all(checks):
                 message = "I'm a member !"
+                print(message)
                 self.communicator.send(message, socket_udp, info_sent = True)
             else:
                 print("I'm not a member !")

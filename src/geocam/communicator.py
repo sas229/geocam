@@ -46,14 +46,15 @@ class CustomSocket(socket.socket):
         print("socket closed")
         self.close()
 
+# TODO: change the classes 
 class Behavior():
 
     def __init__(self, **kwargs) -> None:
         # si ça bug essaie avec pop au lieu de get 
         # ids and connections "numbers" - papers of the communicator
         self.mcast_grp:str = kwargs.get("mcast_grp", "224.1.1.1")
-        self.mcast_port:int = kwargs.get("mcast_port", 9998)
-        self.tcp_port:int = kwargs.get("tcp_port", 47822)
+        self.mcast_port:int = kwargs.get("mcast_port", 1965)
+        self.tcp_port:int = kwargs.get("tcp_port", 1645)
 
     def set_socket(self) -> None:
         pass
@@ -134,11 +135,14 @@ class CrowdMember(Behavior):
             print('timeout =', timeout, 's')
         return sock_udp
 
-    def respond_to_broadcaster(self, sock_udp:CustomSocket, message:str) -> None:
-        sock_udp.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
+    def respond_to_broadcaster(self, message:str, sock_udp:CustomSocket, info_sent:str) -> None:
+        print("in respond_to_broadcaster from crowdmember class")
+        sock_udp.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port)) 
+        if info_sent:
+                print(f"{message} sent to {(self.mcast_grp, self.mcast_port)}")
 
     def wait_for_broadcast(self, sock_udp:CustomSocket, info_listen:bool) -> tuple: 
-        print("in wait_for_broadcast from broadcaster class")  
+        print("in wait_for_broadcast from crowdmember class")  
         print("before blocking")
         data, addr = sock_udp.recvfrom(1024)
         print("after blocking")
@@ -150,9 +154,9 @@ class CrowdMember(Behavior):
     def set_socket(self, timeout:int, info_set:bool) -> None:
         return self.crowdmember_set_socket(timeout, info_set)
 
-    def send(self, sock_udp:CustomSocket, message:str) -> None:
+    def send(self, message:str, sock_udp:CustomSocket, info_sent:str) -> None:
         # TODO: inverse message and sock_udp -> copy the template from braodcaster
-        return self.respond_to_broadcaster(sock_udp, message)
+        return self.respond_to_broadcaster(message, sock_udp, info_sent)
 
     def listen(self, sock_udp:CustomSocket, info_listen:bool) -> None: 
         return self.wait_for_broadcast(sock_udp, info_listen)
@@ -419,7 +423,6 @@ def read_json(json_string:str) -> dict:
     """
     return json.loads(json_string) 
 
-
 ## Check if the ip is valid #################################################################################################################
 ############################################################################################################################################# 
 
@@ -445,6 +448,32 @@ def is_valid_ipv6(ip: str) -> bool:
 
 def is_valid_ip(ip: str) -> bool:
     return is_valid_ipv4(ip) or is_valid_ipv6(ip)
+
+## Check if a port is occupied #################################################################################################################
+############################################################################################################################################# 
+
+def is_port_free(port: int) -> bool:
+    if platform.system() == "Windows":
+        command = f"netstat -ano | findstr :{port}"
+    else:
+        command = f"lsof -i :{port}"
+
+    try:
+        result = subprocess.check_output(command, shell=True)
+        return False
+    except subprocess.CalledProcessError:
+        return True
+    
+## List of available ports that can be used see: https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
+ports_candidates_for_TCP_protocol = [1645, 1646, 4944, 5000, 5500, 9600, 10000, 20000, 11100, 19788]
+ports_candidates_for_UDP_protocol = [1965, 3001, 3128, 5070, 5678, 8006, 8008, 8010, 8089, 8448]
+
+def get_free_port(candidates):
+    result = []
+    for port in candidates:
+        if is_port_free(port):
+            result.append(port)
+    return result
 
 #############################################################################################################################################
 ## MAIN #####################################################################################################################################

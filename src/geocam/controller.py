@@ -41,9 +41,9 @@ class Controller:
         ## first: create the request that will be sent to the members.
 
         # these informations are used to confirm that the targets are members.
-        members_os_name = "posix" # TODO: should modify to be an input of the user. 
-        members_plateform = "Linux" # TODO: should modify to be an input of the user too. 
-        prefix_of_host_name = "rp" # example: rp1 - NOTE: same for all mambers.
+        members_os_name = "nt" #"posix" # TODO: should modify to be an input of the user. 
+        members_plateform = "Windows" #"Linux" # TODO: should modify to be an input of the user too. 
+        prefix_of_host_name = "L" #"rp" # example: rp1 - NOTE: same for all mambers.
 
         # create the request using the communicator.create_json function. 
         command = "registration" 
