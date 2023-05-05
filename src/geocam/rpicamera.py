@@ -6,92 +6,130 @@
 :Author(s): Hilario Greggi, Sam Stanier, Zewen Wang, Wenhan Du, Barry Lehane
 
 """
+
+#############################################################################################################################################
+## IMPORTS ##################################################################################################################################
+#############################################################################################################################################
+
 from geocam import communicator
 import json
 import os 
 import platform
 import socket
+import time 
+
+#############################################################################################################################################
+## CLASS ####################################################################################################################################
+#############################################################################################################################################
 
 class RPicamera(): 
 
     def __init__(self): 
         print("Created a RPicamera instance.")
-        print("[INITIALISATION]")
-        # initialisation: setup 
-        self.sender = communicator.Sender()
-        self.receiver = communicator.Receiver()
+        # instanciate a Communicator
+        self.communicator = communicator.Communicator(device = "member")
+        print("behavior :", self.communicator.behavior)
 
-        # initialisation: Controller information
-        self.ipaddr = self.sender.get_host_ip()
-        self.macaddr = self.sender.get_mac_address()
+        # machine infos
+        self.name = communicator.get_host_name()
+        self.ipaddr = communicator.get_host_ip()
+        self.macaddr = communicator.get_mac_address()
 
-        print('ips', self.ipaddr)
-        print('mac', self.macaddr)
+        # print("name", self.name)
+        # print("ipaddr", self.ipaddr)
+        # print("macaddr", self.macaddr)
 
-#############################################################################################################################################
-## IN PROGRESS ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##############
-############################################################################################################################################# 
+    def stand_by_for_request(self, timeout:int = 10) -> None: # long run no timeout - used for dev 
+
+        ## first: set a socket listening for broadcast
+        with self.communicator.set_socket(timeout, info_set = True) as s: 
+            print("in the block")
+            while True:
+                try:
+                    start_time = time.time()
+                    print("trying to listen")
+                    data, addr = self.communicator.listen(s, info_listen = True)
+                    if data: # this condition is true is data is received 
+                        request = communicator.read_json(data)
+                        self.excecute(request, addr, socket_udp = s) # in this case the socket is needed to send a response
+                except TimeoutError:
+                    event_time = time.time()
+                    time_past = event_time - start_time
+                    print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
+                    break
     
-    def excecute(self, request:dict, addr:str) -> None:
-        # get the command and arguments 
+    def excecute(self, request:dict, addr:str, socket_udp:communicator.CustomSocket, print_info:bool = True) -> None:
+        #TODO: add some asserts to check if the sockets sockets to send info 
+        #TODO: write print_info to ask for info when running
         
+        ## first: parse the request
         command = request['command']
         arguments = request['arguments']
 
+        ## second: given the command/arguments, do the correct job 
+        # REGISTRATION 
         if command == "registration":
-            print("[START REGISTRATION")
-            # we must check that the device what it's suppose to be: in thise first version of the system: a RPi with a specific hostname runnning on Linux
-            # check 1 os name must be the same as the ones sent by the controller 
-            os_name = os.name
-            check1 = os_name == arguments["os_name"]
-            # check 2 plateform name must be the same as the ones sent by the controller 
-            plateform_system = platform.system()
-            check2 = plateform_system == arguments["plateform"]
-            # check 3 prefix of hostname must be the same as the ones sent by the controller 
-            hostname = self.receiver.get_host_name()
-            check3 = hostname == arguments["prefix"].startswith("rp")
+            print(f"{command} job")
+            # when receiving this command, a response should only be sent if the machine is a member 
+            # this is checked given the argents of the request 
+            # check1 os name 
+            check1 = os.name == arguments["os_name"]
+            # check 2 plateform name 
+            check2 = platform.system() == arguments["plateform"]
+            # check 3 prefix of hostname 
+            check3 = communicator.get_host_name() == arguments["prefix"].startswith("rp")
             # bundle the checks in a list
             checks = [check1, check2, check3] 
-            # if all checks then only then respond 
-
-#############################################################################################################################################
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-
             if all(checks):
-                self.sender.sendto(b"pong", addr)
-                print('response sent')
+                message = "I'm a member !"
+                self.communicator.send(message, socket_udp, info_sent = True)
+            else:
+                print("I'm not a member !")
 
-###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!########
-## IN PROGRESS NOW ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##########
+        # IDENTIFICATION
+        if command == "identification":
+            print(f"{command} job")
+            pass 
+
+        # AQUIRE IMAGES 
+        # NOTE: think of the storage of the images  
+        if command == "aquire_images":
+            print(f"{command} job")
+            pass 
+
+        # CALIBRATE
+        if command == "calibrate":
+            print(f"{command} job")
+            pass 
+
+        # CONFIGURE CAMERAS 
+        if command == "configure_cameras":
+            print(f"{command} job")
+            pass 
+        
+        # REBOOT 
+        if command == "reboot":
+            print(f"{command} job")
+            pass 
+
+        # SHUTDOWN 
+        if command == "shutdown":
+            print(f"{command} job")
+            pass 
+
+        # INITIAL SCANNING 
+        if command == "initial_scanning":
+            print(f"{command} job")
+
+
 #############################################################################################################################################
-
-
-        if command == "id":
-            print("[START] id command")
-            self.controler_ip = arguments["id_address"]
-            type_of_info = "pi_id"
-            content = {"hostname":self.hostname, "ip_addr":self.ip_addr, "mac_addr":self.mac_addr}
-            response = self.create_json(type_of_info, content)
-            self.computer_ipaddr = arguments["id_address"]
-            self.tcp_protocol_send(self.computer_ipaddr, response) 
-            print('response sent') 
+## MAIN #####################################################################################################################################
+#############################################################################################################################################
 
 if __name__ == "__main__": 
     # TODO: change the network_status function - so it returns info usable to start or not the process
-    # instanciate a RPicamera class 
     rpicamera = RPicamera()
-    # set a socket for listening to the MCAST_GRP
-    udp_socket_waiting_for_requests = rpicamera.receiver.socket_for_broadcast_listenning()
-    # infinitly wait for requests and execute them 
-    while True:
-        # get the requests in bytes 
-        data, addr = rpicamera.receiver.get_requests(udp_socket_waiting_for_requests)
-        # parse the request to a python dict
-        request = rpicamera.receiver._read_json(data)
-        # execute the request
-        rpicamera.excecute(request, addr)
+    rpicamera.stand_by_for_request(timeout=10)
 
-#############################################################################################################################################
-## IN PROGRESS ###!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!##############
-############################################################################################################################################# 
+    
+

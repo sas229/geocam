@@ -6,6 +6,7 @@
 :Author(s): Hilario Greggi, Sam Stanier, Zewen Wang, Wenhan Du, Barry Lehane
 
 """
+
 #############################################################################################################################################
 ## IMPORTS ##################################################################################################################################
 #############################################################################################################################################
@@ -91,13 +92,14 @@ class Broadcaster(Behavior):
             print(f"{message} sent to {(self.mcast_grp, self.mcast_port)}")
 
     def listen_to_members(self, sock_udp:CustomSocket, info_listen:bool) -> tuple:
-        print("in listen_to_members from broadcaster class") 
-        while True: 
-            data, addr = sock_udp.recvfrom(1024)
-            if data: 
-                if info_listen:
-                    print(f"{data} received from {addr}")
-                return data, addr
+        print("in listen_to_members from broadcaster class")  
+        print("before blocking")
+        data, addr = sock_udp.recvfrom(1024)
+        print("after blocking")
+        if data: 
+            if info_listen:
+                print(f"{data} received from {addr}")
+            return data, addr
             
     def set_socket(self, timeout:int, info_set:bool) -> None:
         return self.broadcaster_set_socket(timeout, info_set)
@@ -111,6 +113,7 @@ class Broadcaster(Behavior):
     ## think about closing the sock when finished !!!
 
 class CrowdMember(Behavior):
+    # TODO: write about the asserts 
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -118,37 +121,41 @@ class CrowdMember(Behavior):
     def __str__(self) -> str:
         return "crowdmember"
 
-    def crowdmember_set_socket(self, timeout:int) -> CustomSocket:
+    def crowdmember_set_socket(self, timeout:int, info_set:bool) -> CustomSocket:
         sock_udp = CustomSocket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock_udp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
         sock_udp.bind(('', self.mcast_port))
         mreq = struct.pack("4sl", socket.inet_aton(self.mcast_grp), socket.INADDR_ANY)
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         sock_udp.settimeout(timeout)
-        print('socket set')
-        print('timeout =', timeout, 's')
+        if info_set:
+            print("in crowdmember_set_socket from crowdmember")
+            print('socket set')
+            print('timeout =', timeout, 's')
         return sock_udp
 
     def respond_to_broadcaster(self, sock_udp:CustomSocket, message:str) -> None:
         sock_udp.sendto(bytes(message, encoding="utf-8"), (self.mcast_grp, self.mcast_port))
 
-    def wait_for_broadcast(self, sock_udp:CustomSocket, timeout:int = 5) -> tuple: # get rid of the timeout when it will work or write an if timeout condition
-        sock_udp.settimeout(timeout)
-        while True: 
-            try: 
-                data, addr = sock_udp.recvfrom(1024)
-            except TimeoutError:
-                break
-        return data, addr   
+    def wait_for_broadcast(self, sock_udp:CustomSocket, info_listen:bool) -> tuple: 
+        print("in wait_for_broadcast from broadcaster class")  
+        print("before blocking")
+        data, addr = sock_udp.recvfrom(1024)
+        print("after blocking")
+        if data: 
+            if info_listen:
+                print(f"{data} received from {addr}")
+            return data, addr   
 
-    def set_socket(self, timeout:int) -> None:
-        return self.crowdmember_set_socket(timeout)
+    def set_socket(self, timeout:int, info_set:bool) -> None:
+        return self.crowdmember_set_socket(timeout, info_set)
 
     def send(self, sock_udp:CustomSocket, message:str) -> None:
+        # TODO: inverse message and sock_udp -> copy the template from braodcaster
         return self.respond_to_broadcaster(sock_udp, message)
 
-    def listen(self, sock_udp:CustomSocket) -> None: 
-        return self.wait_for_broadcast(sock_udp)
+    def listen(self, sock_udp:CustomSocket, info_listen:bool) -> None: 
+        return self.wait_for_broadcast(sock_udp, info_listen)
 
     ## think about closing the sock when finished !!!
 
@@ -394,7 +401,7 @@ def create_json(command:str, arguments:dict) -> str:
     str
         string representing a JSON object
     """      
-    _dict = {"command":command ,"arguments":str(arguments)}
+    _dict = {"command":command ,"arguments":arguments}
     return json.dumps(_dict, indent=2)
 
 def read_json(json_string:str) -> dict: 
