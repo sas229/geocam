@@ -16,7 +16,6 @@ class RPicamera():
 
     def __init__(self): 
         print("Created a RPicamera instance.")
-
         print("[INITIALISATION]")
         # initialisation: setup 
         self.sender = communicator.Sender()
@@ -79,6 +78,7 @@ class RPicamera():
             print('response sent') 
 
 if __name__ == "__main__": 
+    # TODO: change the network_status function - so it returns info usable to start or not the process
     # instanciate a RPicamera class 
     rpicamera = RPicamera()
     # set a socket for listening to the MCAST_GRP
