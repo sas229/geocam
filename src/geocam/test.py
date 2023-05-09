@@ -33,14 +33,14 @@ print(free_ports_for_UDP_protocol)
 
 ## NEW CLASSES
 
-class CollaboratorBehavior:
+class Collaborator():
     def listen(self):
         pass
 
     def send(self):
         pass
 
-class BroadcastBehavior(CollaboratorBehavior):
+class Broadcaster(Collaborator):
     def listen(self):
         raise NotImplementedError("Subclasses of CollaboratorBehavior must implement listen method")
 
@@ -48,15 +48,13 @@ class BroadcastBehavior(CollaboratorBehavior):
         # implementation for broadcast behavior
         pass
 
-    
-
-class ListenBehavior(CollaboratorBehavior):
+class ListenBehavior(Collaborator):
     def listen(self):
         # implementation for listen behavior
         pass
 
 class Communicator():
-    def __init__(self, behavior: CollaboratorBehavior):
+    def __init__(self, behavior: Collaborator):
         self.behavior = behavior
 
     def listen(self):
@@ -64,3 +62,4 @@ class Communicator():
 
     def send(self):
         self.behavior.send()
+

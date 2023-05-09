@@ -8,15 +8,26 @@
 """
 
 #############################################################################################################################################
+## TODO's ###################################################################################################################################
+#############################################################################################################################################
+""" 
+1. Add some asserts 
+2. Code the loggings 
+"""
+
+#############################################################################################################################################
 ## IMPORTS ##################################################################################################################################
 #############################################################################################################################################
 
-from geocam import communicator
 import json
 import os 
 import platform
 import socket
 import time 
+
+from geocam.communicator import *
+from geocam.utils import *
+
 
 #############################################################################################################################################
 ## CLASS ####################################################################################################################################
@@ -24,43 +35,35 @@ import time
 
 class RPicamera(): 
 
-    def __init__(self): 
+    def __init__(self) -> None: 
         print("Created a RPicamera instance.")
-        # instanciate a Communicator
-        self.communicator = communicator.Communicator(device = "member")
-        print("behavior :", self.communicator.behavior)
-
-        # machine infos
-        self.name = communicator.get_host_name()
-        self.ipaddr = communicator.get_host_ip()
-        self.macaddr = communicator.get_mac_address()
-
-        # print("name", self.name)
-        # print("ipaddr", self.ipaddr)
-        # print("macaddr", self.macaddr)
+        # instanciate an Agent and a Collaborator
+        self.agent = Communicator(Communicator.AGENT)
+        self.collaborator = Communicator(Communicator.COLLABORATOR)
+        self.id_info = {"host_name":get_host_name(), "ip_addr":get_host_ip(), "mac_addr":get_mac_address()}
 
     def stand_by_for_request(self, timeout:int = 10) -> None: # long run no timeout - used for dev 
 
         ## first: set a socket listening for broadcast
-        with self.communicator.set_socket(timeout, info_set = True) as s: 
+        with self.agent.set_socket(timeout, info_set = True) as sock_udp: 
             print("in the block")
             while True:
                 try:
                     start_time = time.time()
                     print("trying to listen")
-                    data, addr = self.communicator.listen(s, info_listen = True)
+                    data, addr = self.agent.listen(sock_udp = sock_udp, info_listen = True)
                     if data: # this condition is true is data is received 
-                        request = communicator.read_json(data)
-                        self.excecute(request, addr, socket_udp = s) # in this case the socket is needed to send a response
+                        request = read_json(data)
+                        with self.collaborator.set_socket(timeout=5) as sock_tcp:
+                            self.excecute(request, sock_tcp, addr) # in this case the socket is needed to send a response
+                
                 except TimeoutError:
                     event_time = time.time()
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
                 break
     
-    def excecute(self, request:dict, addr:str, socket_udp:communicator.CustomSocket, print_info:bool = True) -> None:
-        #TODO: add some asserts to check if the sockets sockets to send info 
-        #TODO: write print_info to ask for info when running
+    def excecute(self, request:dict, socket_tcp:CustomSocket, addr:str, print_info:bool = True) -> None:
         
         ## first: parse the request
         command = request['command']
@@ -77,20 +80,17 @@ class RPicamera():
             # check 2 plateform name 
             check2 = platform.system() == arguments["plateform"]
             # check 3 prefix of hostname 
-            check3 = communicator.get_host_name().startswith(arguments["prefix"])
+            check3 = get_host_name().startswith(arguments["prefix"])
             # bundle the checks in a list
             checks = [check1, check2, check3] 
             if all(checks):
-                message = "I'm a member !"
-                print(message)
-                self.communicator.send(message, socket_udp, info_sent = True)
+                print("I'm a member !")
+                type_of_info = command
+                content = self.id_info
+                message = create_json(type_of_info, content)
+                self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
             else:
                 print("I'm not a member !")
-
-        # IDENTIFICATION
-        if command == "identification":
-            print(f"{command} job")
-            pass 
 
         # AQUIRE IMAGES 
         # NOTE: think of the storage of the images  

@@ -8,10 +8,18 @@
 """
 
 #############################################################################################################################################
+## TODO's ###################################################################################################################################
+#############################################################################################################################################
+""" 
+1. Move the timeout from set_socket to listen 
+"""
+
+#############################################################################################################################################
 ## IMPORTS ##################################################################################################################################
 #############################################################################################################################################
 
-from geocam import communicator 
+from geocam.communicator import *
+from geocam.utils import *
 import socket 
 import traceback
 import time
@@ -22,10 +30,14 @@ import time
 
 class Controller:
 
-    def __init__(self):
+    RPI_INFOS:dict = {"os_name":"posix", "plateform":"Linux", "prefix":"rp"}
+    PC_PERSO_INFOS:dict = {"os_name":"nt", "plateform":"Windows", "prefix":"L"}
+
+    def __init__(self) -> None:
         print("Created a Controller instance.")
-        # instanciate a Communicator
-        self.communicator = communicator.Communicator(device = "controller") 
+        # instanciate a Leader and a Collaborator
+        self.leader = Communicator(Communicator.LEADER) 
+        self.collaborator = Communicator(Communicator.COLLABORATOR)
         # initiate the number of members 
         self.number_of_members = 0
 
@@ -36,50 +48,46 @@ class Controller:
         """
         return 
 
-    def list_the_registrants(self, timeout:int = 3) -> int: 
+    def registration(self, timeout:int = 10) -> int: 
 
-        ## first: create the request that will be sent to the members.
+        print("before registration: self.number_of_members = ", self.number_of_members)
 
-        # these informations are used to confirm that the targets are members.
-        members_os_name = "nt" #"posix" # TODO: should modify to be an input of the user. 
-        members_plateform = "Windows" #"Linux" # TODO: should modify to be an input of the user too. 
-        prefix_of_host_name = "L" #"rp" # example: rp1 - NOTE: same for all mambers.
-
-        # create the request using the communicator.create_json function. 
+        ## first: create the request that will be sent to the members. 
         command = "registration" 
-        arguments = {"os_name":members_os_name, "plateform":members_plateform, "prefix":prefix_of_host_name}
-        request = communicator.create_json(command, arguments)
+        arguments = self.RPI_INFOS
+        request = create_json(command, arguments)
 
-        ## second: since this module is used on controller no need to change its behavior, 
-        # default behavior of controllers being broadcaster. However, it's good practice 
-        # to check anyway.
+        ## second: assert the communicator 
+        assert isinstance(self.leader.behavior, Leader)
 
-        assert isinstance(self.communicator.behavior, communicator.Broadcaster)
-        # NOTE: self.communicator.behavior: Communicator current behavior
-        # NOTE: communicator.Broadcaster: behavior of the controller when asking registrations
-
-        ## third: set the socket for broadcast, send the request and wait for answers from 
-        # members. 
+        ## third: set the socket for broadcast, send the request and wait for answers from members. 
         # TODO: the timeout should be given to listen and not the set_socket function 
         print("[send/listen]")
-        with self.communicator.set_socket(timeout, info_set = True) as s: #timeout in seconds - info_set = True to print info  
-            print("in the block")
-            self.communicator.send(request, sock_udp = s, info_sent = True)
+
+        with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
+            # send request
+            with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
+                print("in the block")
+                self.leader.send(request, sock_udp = sock_udp, info_sent = False)
+
+            # wait for answers
             while True:
                 try:
                     start_time = time.time()
-                    print("trying to listen")
-                    data, addr = self.communicator.listen(s, info_listen = True)
+                    data, addr = self.collaborator.listen(sock_tcp = sock_tcp, info_listen = True)
                     if data: # this line basically tests if something was received 
                         print("something received")
+                        print(data)
                         self.number_of_members += 1
                 except TimeoutError:
                     event_time = time.time()
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
                     break
+                else:
+                    break
 
-        print("self.number_of_members = ", self.number_of_members)
+        print("after registration: self.number_of_members = ", self.number_of_members)
 
 ### Functions to be written 
 
@@ -112,6 +120,6 @@ class Controller:
 
 if __name__ == "__main__": 
     # check the network
-    communicator.network_status()
+    network_status()
     controller = Controller()
-    controller.list_the_registrants()
+    controller.registration()

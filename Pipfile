@@ -15,6 +15,9 @@ sphinx-rtd-theme = "*"
 colorama = "*"
 geocam = {editable = true, path = '.'}
 sphinx = "*"
+getmac = "*"
+pytest = "*"
+mock = "*"
 
 [requires]
 python_version = "3.10"
