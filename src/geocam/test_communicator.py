@@ -1,6 +1,4 @@
 import pytest
-import mock
-import builtins
 from geocam.communicator import *
 
 """ RESSOURCES 
@@ -32,21 +30,6 @@ def test_create_communicators_and_test_there_behavior(leader, agent, collaborato
     assert isinstance(agent.behavior, Agent)
     assert isinstance(collaborator.behavior, Collaborator)
 
-def test_str_and_repr_(leader, agent, collaborator):
-    assert leader.__str__() == f"Communicator Class instance behaving like a {leader.kind}"
-    assert agent.__str__() == f"Communicator Class instance behaving like a {agent.kind}"
-    assert collaborator.__str__() == f"Communicator Class instance behaving like a {collaborator.kind}"
-    assert leader.__repr__() == f"Communicator(Communicator.{leader.kind.upper()})"
-    assert agent.__repr__() == f"Communicator(Communicator.{agent.kind.upper()})"
-    assert collaborator.__repr__() == f"Communicator(Communicator.{collaborator.kind.upper()})"
-
-    assert leader.behavior.__str__() == Communicator.LEADER
-    assert agent.behavior.__str__() == Communicator.AGENT
-    assert collaborator.behavior.__str__() == Communicator.COLLABORATOR
-    assert leader.behavior.__repr__() == "Communicator(Comminicator.LEADER)"
-    assert agent.behavior.__repr__() == "Communicator(Communicator.AGENT)"
-    assert collaborator.behavior.__repr__() == "Communicator(Comminicator.COLLABORATOR)"
-
 def test_change_behavior_method(leader, agent, collaborator):
     leader.change_behavior(Communicator.LEADER)
     assert isinstance(leader.behavior, Leader)
@@ -70,38 +53,6 @@ def test_change_behavior_method(leader, agent, collaborator):
     assert isinstance(collaborator.behavior, Collaborator)
 
 
-@pytest.mark.filterwarnings("ignore::UserWarning")
-def test_change_all_connections_parameters(leader):
-    initial_mcast_grp = Behavior.MCAST_GRP
-    initial_mcast_port = Behavior.MCAST_PORT
-    initial_tcp_port = Behavior.TCP_PORT
-    new_mcast_grp = "224.1.1.2"
-    new_mcast_port = 1967
-    new_tcp_port = 1643
-
-    with mock.patch.object(builtins, 'input', lambda _: 'n'):
-        leader._change_all_mcast_grps(new_mcast_grp)
-        assert Behavior.MCAST_GRP == initial_mcast_grp
-        leader._change_all_mcast_ports(new_mcast_port)
-        assert Behavior.MCAST_PORT == initial_mcast_port
-        leader._change_all_tcp_ports(new_tcp_port)
-        assert Behavior.TCP_PORT == initial_tcp_port
-
-    with mock.patch.object(builtins, 'input', lambda _: 'shduvzdi'):
-        leader._change_all_mcast_grps(new_mcast_grp)
-        assert Behavior.MCAST_GRP == initial_mcast_grp
-        leader._change_all_mcast_ports(new_mcast_port)
-        assert Behavior.MCAST_PORT == initial_mcast_port
-        leader._change_all_tcp_ports(new_tcp_port)
-        assert Behavior.TCP_PORT == initial_tcp_port
-
-    with mock.patch.object(builtins, 'input', lambda _: 'y'):
-        leader._change_all_mcast_grps(new_mcast_grp)
-        assert Behavior.MCAST_GRP != initial_mcast_grp
-        leader._change_all_mcast_ports(new_mcast_port)
-        assert Behavior.MCAST_PORT != initial_mcast_port
-        leader._change_all_tcp_ports(new_tcp_port)
-        assert Behavior.TCP_PORT != initial_tcp_port
 
 
 

@@ -71,6 +71,7 @@ class Controller:
                 self.leader.send(request, sock_udp = sock_udp, info_sent = False)
 
             # wait for answers
+            # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
             while True:
                 try:
                     start_time = time.time()
@@ -85,7 +86,7 @@ class Controller:
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
                     break
                 else:
-                    break
+                    break # in the current sate only one registration is possible TODO: change that 
 
         print("after registration: self.number_of_members = ", self.number_of_members)
 

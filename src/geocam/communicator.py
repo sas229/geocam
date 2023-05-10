@@ -38,7 +38,7 @@ from geocam.utils import network_status
 ## CLASSES ##################################################################################################################################
 #############################################################################################################################################
 
-class CustomSocket(socket.socket):
+class CustomSocket(socket.socket): #TODO: replace by @context manager from contextlib 
     """Allow the use of context managers
     Its a class no parameters 
 
@@ -151,6 +151,7 @@ class Collaborator(Behavior):
             target_ip = "127.0.0.1"
 
         target_address = (target_ip, self.TCP_PORT)
+        # TODO: check out create_connection 
         while True:
             try: 
                 print(target_address)
@@ -169,6 +170,7 @@ class Collaborator(Behavior):
             break
 
     def listen(self, sock_tcp:CustomSocket) -> tuple:
+        # TODO: check out create_server 
         ipaddr = get_host_ip()
         sock_tcp.bind((ipaddr, self.TCP_PORT))
         sock_tcp.listen()
