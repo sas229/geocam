@@ -146,7 +146,8 @@ class Collaborator(Behavior):
     def send(self, message:str, sock_tcp:CustomSocket, target_ip:str, info_sent:bool) -> None:
 
         # to handle the case of no wlan or lan  
-        # NOTE: this is a quick fix but maybe it will be enough  
+        # NOTE: this is a quick fix but maybe it will be enough 
+        print() 
         if network_status() == "no_network":
             target_ip = "127.0.0.1"
 

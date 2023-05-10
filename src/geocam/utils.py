@@ -119,6 +119,7 @@ def network_status(remote_server:str = "google.com") -> str:
 ## Create JSON ##############################################################################################################################
 ############################################################################################################################################# 
 
+# TODO: change create_json so it uses different key names in function of who is sending the file
 def create_json(command:str, arguments:dict) -> str:
     """_summary_
 
