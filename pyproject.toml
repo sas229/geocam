@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geocam"
-version = "0.0.2"
+version = "0.0.1"
 authors = [
   { name="Hilario Greggi", email="greggi.hilario@gmail.com" },
   { name="Sam Stanier", email="sas229@cam.ac.uk" },
@@ -16,7 +16,7 @@ authors = [
   { name="Barry Lehane", email="barry.lehane@uwa.edu.au" },
 
 ]
-description = "Camera control software for geotechnical research applications. Very first update"
+description = "Camera control software for geotechnical research applications."
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
