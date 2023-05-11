@@ -24,7 +24,7 @@ import os
 import platform
 import socket
 import time 
-# from picamera import Picamera
+from picamera import Picamera
 
 from geocam.communicator import *
 from geocam.utils import *
@@ -97,9 +97,9 @@ class RPicamera():
         # NOTE: think of the storage of the images  
         if command == "capture_images":
             print(f"{command} job")
-            # picam2 = Picamera2()
-            # # picam2.sensor_mode = 2
-            # picam2.start_and_capture_files(f"{self.hostname}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
+            picam2 = Picamera2()
+            # picam2.sensor_mode = 2
+            picam2.start_and_capture_files(f"{self.hostname}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
 
         # CALIBRATE
         if command == "calibrate":
@@ -134,8 +134,8 @@ if __name__ == "__main__":
     # TODO: change the network_status function - so it returns info usable to start or not the process
     rpicamera = RPicamera()
     # rpicamera.stand_by_for_request(timeout=10)
-    request = create_json("capture_images", {"delay":1 , "number_of_images":2})
-    rpicamera.excecute(request = request)
+    request = read_json(create_json("capture_images", {"delay":1 , "number_of_images":2}))
+    rpicamera.excecute(request)
 
     
 
