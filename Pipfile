@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 geocam = {editable = true, path = '.'}
-sphinx = "*"
 getmac = "*"
 pytest = "*"
 mock = "*"
@@ -15,6 +14,7 @@ numpy = "*"
 [dev-packages]
 build = "*"
 twine = "*"
+sphinx = "*"
 sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
