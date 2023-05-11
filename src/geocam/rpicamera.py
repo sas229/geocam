@@ -24,6 +24,7 @@ import os
 import platform
 import socket
 import time 
+# from picamera import Picamera
 
 from geocam.communicator import *
 from geocam.utils import *
@@ -63,7 +64,7 @@ class RPicamera():
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
                 break
     
-    def excecute(self, request:dict, socket_tcp:CustomSocket, addr:str, print_info:bool = True) -> None:
+    def excecute(self, request:dict, socket_tcp:CustomSocket = None, addr:str = None, print_info:bool = True) -> None:
         
         ## first: parse the request
         command = request['command']
@@ -94,9 +95,11 @@ class RPicamera():
 
         # AQUIRE IMAGES 
         # NOTE: think of the storage of the images  
-        if command == "aquire_images":
+        if command == "capture_images":
             print(f"{command} job")
-            pass 
+            # picam2 = Picamera2()
+            # # picam2.sensor_mode = 2
+            # picam2.start_and_capture_files(f"{self.hostname}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
 
         # CALIBRATE
         if command == "calibrate":
@@ -130,7 +133,9 @@ class RPicamera():
 if __name__ == "__main__": 
     # TODO: change the network_status function - so it returns info usable to start or not the process
     rpicamera = RPicamera()
-    rpicamera.stand_by_for_request(timeout=10)
+    # rpicamera.stand_by_for_request(timeout=10)
+    request = create_json("capture_images", {"delay":1 , "number_of_images":2})
+    rpicamera.excecute(request = request)
 
     
 
