@@ -99,7 +99,8 @@ class RPicamera():
             print(f"{command} job")
             picam2 = Picamera2()
             # picam2.sensor_mode = 2
-            picam2.start_and_capture_files(f"{self.hostname}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
+            host_name = self.id_info["host_name"]
+            picam2.start_and_capture_files(f"{host_name}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
 
         # CALIBRATE
         if command == "calibrate":
