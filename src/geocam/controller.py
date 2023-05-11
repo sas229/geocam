@@ -48,7 +48,7 @@ class Controller:
         """
         return 
 
-    def registration(self, timeout:int = 10) -> int: 
+    def registration(self, timeout:int = 10) -> None: 
 
         print("before registration: self.number_of_members = ", self.number_of_members)
 
@@ -90,6 +90,53 @@ class Controller:
 
         print("after registration: self.number_of_members = ", self.number_of_members)
 
+    def aquire_images(self, delay:int = 1, number_of_images:int = 2, timeout:int = 30) -> None:
+
+        self.registration()
+
+        print("[START CAPTURE]")
+
+        ## first: create the request that will be sent to the members. 
+        command = "capture_images" 
+        arguments = "capture_images", {"delay":delay , "number_of_images":number_of_images}
+        request = create_json(command, arguments)
+
+        ## second: assert the communicator 
+        assert isinstance(self.leader.behavior, Leader)
+
+        ## third: set the socket for broadcast, send the request and wait for answers from members. 
+        # TODO: the timeout should be given to listen and not the set_socket function 
+        print("[send/listen]")
+
+        with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
+            # send request
+            with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
+                print("in the block")
+                self.leader.send(request, sock_udp = sock_udp, info_sent = False)
+
+            # wait for answers
+            # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
+            confirmations = 0
+            while True:
+                print(confirmations)
+                try:
+                    start_time = time.time()
+                    data, addr = self.collaborator.listen(sock_tcp = sock_tcp, info_listen = True)
+                    if data and confirmations < self.number_of_members: # this line basically tests if something was received 
+                        print("something received")
+                        print(data)
+                        print("confirmations")
+                except TimeoutError:
+                    event_time = time.time()
+                    time_past = event_time - start_time
+                    print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
+                    break
+                else:
+                    break # in the current sate only one registration is possible TODO: change that 
+
+        print("[All have confirmed]")
+        
+
 ### Functions to be written 
 
     def configure_cameras(self): 
@@ -123,4 +170,5 @@ if __name__ == "__main__":
     # check the network
     network_status()
     controller = Controller()
-    controller.registration()
+    # controller.registration()
+    controller.aquire_images(delay = 1, number_of_images = 2)

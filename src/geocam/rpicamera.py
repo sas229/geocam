@@ -101,6 +101,10 @@ class RPicamera():
             # picam2.sensor_mode = 2
             host_name = self.id_info["host_name"]
             picam2.start_and_capture_files(f"{host_name}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
+            type_of_info = command
+            content = f"{command} job done"
+            message = create_json(type_of_info, content)
+            self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
 
         # CALIBRATE
         if command == "calibrate":
@@ -134,9 +138,9 @@ class RPicamera():
 if __name__ == "__main__": 
     # TODO: change the network_status function - so it returns info usable to start or not the process
     rpicamera = RPicamera()
-    # rpicamera.stand_by_for_request(timeout=10)
-    request = read_json(create_json("capture_images", {"delay":1 , "number_of_images":2}))
-    rpicamera.excecute(request)
+    rpicamera.stand_by_for_request(timeout=10)
+    # request = read_json(create_json("capture_images", {"delay":1 , "number_of_images":2}))
+    # rpicamera.excecute(request)
 
     
 
