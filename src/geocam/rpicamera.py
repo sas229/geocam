@@ -24,7 +24,7 @@ import os
 import platform
 import socket
 import time 
-from picamera import Picamera
+from picamera2 import Picamera2
 
 from geocam.communicator import *
 from geocam.utils import *
