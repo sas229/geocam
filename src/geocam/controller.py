@@ -98,7 +98,7 @@ class Controller:
 
         ## first: create the request that will be sent to the members. 
         command = "capture_images" 
-        arguments = "capture_images", {"delay":delay , "number_of_images":number_of_images}
+        arguments = {"delay":delay , "number_of_images":number_of_images}
         request = create_json(command, arguments)
 
         ## second: assert the communicator 
