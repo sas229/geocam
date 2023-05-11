@@ -4,6 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+geocam = {editable = true, path = '.'}
+sphinx = "*"
+getmac = "*"
+pytest = "*"
+mock = "*"
+pyshine = "==0.0.9"
+pillow = "*"
+numpy = "*"
 
 [dev-packages]
 build = "*"
@@ -13,14 +21,6 @@ sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
 colorama = "*"
-geocam = {editable = true, path = '.'}
-sphinx = "*"
-getmac = "*"
-pytest = "*"
-mock = "*"
-pyshine = "==0.0.9"
-pillow = "*"
-numpy = "*"
 
 [requires]
 python_version = "3.10"
