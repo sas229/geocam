@@ -10,7 +10,6 @@ getmac = "*"
 pytest = "*"
 mock = "*"
 pyshine = "==0.0.9"
-pillow = "*"
 numpy = "*"
 
 [dev-packages]
@@ -21,6 +20,7 @@ sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
 colorama = "*"
+pillow = "*"
 
 [requires]
 python_version = "3.10"
