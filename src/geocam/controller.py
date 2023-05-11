@@ -154,13 +154,6 @@ class Controller:
         - Calls functions from the calibration module 
         """ 
         return
-    
-    def aquire_images(self):
-        """
-        - Start taking the pictures 
-        - The way to retrieve them should be discussed
-        """
-        return
 
 #############################################################################################################################################
 ## MAIN #####################################################################################################################################

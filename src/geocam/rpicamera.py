@@ -24,7 +24,7 @@ import os
 import platform
 import socket
 import time 
-from picamera2 import Picamera2
+# from picamera2 import Picamera2
 
 from geocam.communicator import *
 from geocam.utils import *
@@ -62,7 +62,7 @@ class RPicamera():
                     event_time = time.time()
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
-                break
+                
     
     def excecute(self, request:dict, socket_tcp:CustomSocket = None, addr:str = None, print_info:bool = True) -> None:
         
