@@ -248,7 +248,7 @@ class Communicator:
         else: 
             return self.behavior.send()
 
-    def listen(self, sock_udp:CustomSocket = None, sock_tcp:CustomSocket = None, info_listen:bool = False) -> None | tuple:
+    def listen(self, sock_udp:CustomSocket = None, sock_tcp:CustomSocket = None, info_listen:bool = False):
         print("in the listen function of communicator") 
         if isinstance(self.behavior, Collaborator):
             print("tcp listener")
