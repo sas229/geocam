@@ -61,8 +61,10 @@ class CustomSocket(socket.socket): #TODO: replace by @context manager from conte
 class Behavior():
 
     MCAST_GRP:str = "232.18.125.68"
+    # see https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml#multicast-addresses-10 :: Source-Specific Multicast Block (232.0.0.0-232.255.255.255 (232/8))
     MCAST_PORT:int = 1965
     TCP_PORT:int = 1645
+    # see https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers 
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
@@ -74,8 +76,11 @@ class Leader(Behavior):
 
     def set_socket(self, timeout:int, info_set:bool) -> CustomSocket: 
         sock_udp = CustomSocket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        ttl = struct.pack('b', 1)
+        # ttl = struct.pack('b', 1)
+        ttl = 2
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+
+
         sock_udp.settimeout(timeout)
         if info_set: 
             print("in broadcaster_set_socket from broadcaster")
@@ -106,6 +111,7 @@ class Agent(Behavior):
         sock_udp.bind(('', self.MCAST_PORT))
         mreq = struct.pack("4sl", socket.inet_aton(self.MCAST_GRP), socket.INADDR_ANY)
         sock_udp.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+
         sock_udp.settimeout(timeout)
         if info_set:
             print("in crowdmember_set_socket from crowdmember")
