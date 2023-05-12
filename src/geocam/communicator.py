@@ -120,6 +120,7 @@ class Agent(Behavior):
         print("in wait_for_broadcast from crowdmember class")  
         print("before blocking")
         data, addr = sock_udp.recvfrom(1024)
+        print("listening at", self.MCAST_GRP, self.MCAST_PORT)
         print("after blocking")
         if data: 
             if info_listen:

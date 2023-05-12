@@ -68,7 +68,8 @@ class Controller:
             # send request
             with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
                 print("in the block")
-                self.leader.send(request, sock_udp = sock_udp, info_sent = False)
+                self.leader.send(request, sock_udp = sock_udp, info_sent = True)
+                print("info sent")
 
             # wait for answers
             # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
