@@ -60,7 +60,7 @@ class CustomSocket(socket.socket): #TODO: replace by @context manager from conte
 
 class Behavior():
 
-    MCAST_GRP:str = "224.1.1.1"
+    MCAST_GRP:str = "232.18.125.68"
     MCAST_PORT:int = 1965
     TCP_PORT:int = 1645
 

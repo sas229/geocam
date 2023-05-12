@@ -194,5 +194,5 @@ if __name__ == "__main__":
     # check the network
     network_status()
     controller = Controller()
-    controller.registration()
+    controller.registration(timeout=30)
     # controller.aquire_images(delay = 1, number_of_images = 2)
