@@ -135,7 +135,37 @@ class Controller:
                     break # in the current sate only one registration is possible TODO: change that 
 
         print("[All have confirmed]")
-        
+
+    def get_video_stream(self, timeout:int = 10):
+
+        self.registration()
+
+        command = "stream" 
+        arguments = {}
+        request = create_json(command, arguments)
+
+        with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
+            # send request
+            with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
+                print("in the block")
+                self.leader.send(request, sock_udp = sock_udp, info_sent = False)
+
+            # wait for answers
+            # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
+            while True:
+                try:
+                    start_time = time.time()
+                    data, addr = self.collaborator.listen(sock_tcp = sock_tcp, info_listen = True)
+                    if data: # this line basically tests if something was received 
+                        print("something received")
+                        print(data.decode('utf-8'))
+                except TimeoutError:
+                    event_time = time.time()
+                    time_past = event_time - start_time
+                    print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
+                    break
+                else:
+                    break # in the current sate only one registration is possible TODO: change that 
 
 ### Functions to be written 
 

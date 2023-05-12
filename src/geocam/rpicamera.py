@@ -79,7 +79,7 @@ class RPicamera():
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
     
-    def stream(self):
+    def stream(self) -> str:
         StreamProps = ps.StreamProps
         StreamProps.set_Page(StreamProps,self.HTML)
         host_ip = self.id_info["ip_addr"]
@@ -95,6 +95,7 @@ class RPicamera():
             StreamProps.set_Quality(StreamProps,90)
             server = ps.Streamer(address,StreamProps)
             print('Server started at','http://'+address[0]+':'+str(address[1]))
+            yield 'Server started at','http://'+address[0]+':'+str(address[1])
             server.serve_forever()
             
         except KeyboardInterrupt:
@@ -148,7 +149,10 @@ class RPicamera():
         # CALIBRATE
         if command == "stream":
             print(f"{command} job")
-            self.stream() 
+            type_of_info = command
+            content = self.stream()
+            message = create_json(type_of_info, content)
+            self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
 
         # CONFIGURE CAMERAS 
         if command == "configure_cameras":
