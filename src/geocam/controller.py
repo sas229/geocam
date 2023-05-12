@@ -51,10 +51,10 @@ class Controller:
     def registration(self, timeout:int = 10) -> None: 
 
         print("before registration: self.number_of_members = ", self.number_of_members)
-
+        print(get_host_ip())
         ## first: create the request that will be sent to the members. 
         command = "registration" 
-        arguments = self.RPI_INFOS
+        arguments = self.PC_PERSO_INFOS
         request = create_json(command, arguments)
 
         ## second: assert the communicator 
@@ -193,5 +193,5 @@ if __name__ == "__main__":
     # check the network
     network_status()
     controller = Controller()
-    # controller.registration()
-    controller.aquire_images(delay = 1, number_of_images = 2)
+    controller.registration()
+    # controller.aquire_images(delay = 1, number_of_images = 2)

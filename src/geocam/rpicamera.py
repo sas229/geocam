@@ -69,15 +69,19 @@ class RPicamera():
                     start_time = time.time()
                     print("trying to listen")
                     data, addr = self.agent.listen(sock_udp = sock_udp, info_listen = True)
+                    print(addr)
                     if data: # this condition is true is data is received 
                         request = read_json(data)
                         with self.collaborator.set_socket(timeout=5) as sock_tcp:
-                            self.excecute(request, sock_tcp, addr) # in this case the socket is needed to send a response
+                            self.excecute(request, sock_tcp, "172.20.10.2") # in this case the socket is needed to send a response
                 
                 except TimeoutError:
                     event_time = time.time()
                     time_past = event_time - start_time
                     print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
+
+                break
+
     
     def stream(self) -> str:
         StreamProps = ps.StreamProps
@@ -129,7 +133,7 @@ class RPicamera():
                 type_of_info = command
                 content = self.id_info
                 message = create_json(type_of_info, content)
-                self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
+                self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr, info_sent = False)
             else:
                 print("I'm not a member !")
 

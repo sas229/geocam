@@ -241,6 +241,7 @@ class Communicator:
         if isinstance(self.behavior, Collaborator): 
             print("tcp sender")
             # assert is_valid_ip(target_ip)
+            print(target_ip)
             return self.behavior.send(message, sock_tcp, target_ip, info_sent)
         elif isinstance(self.behavior, Leader):
             print("udp sender")
