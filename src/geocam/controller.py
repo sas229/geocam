@@ -18,28 +18,39 @@
 ## IMPORTS ##################################################################################################################################
 #############################################################################################################################################
 
-from geocam.communicator import *
-from geocam.utils import *
+import logging
+import os
+import platform
 import socket 
 import traceback
 import time
+
+from geocam.communicator import *
+from geocam.utils import *
+
 
 #############################################################################################################################################
 ## CLASS ####################################################################################################################################
 #############################################################################################################################################
 
 class Controller:
+    """_summary_
+    """    
 
     RPI_INFOS:dict = {"os_name":"posix", "plateform":"Linux", "prefix":"rp"}
-    PC_PERSO_INFOS:dict = {"os_name":"nt", "plateform":"Windows", "prefix":"L"}
+    CONTROLLER_INFOS:dict = {"os_name":f"{os.name}", "plateform":f"{platform.system()}", "prefix":f"{get_host_name()[:3]}"}
 
     def __init__(self) -> None:
-        print("Created a Controller instance.")
-        # instanciate a Leader and a Collaborator
+        print(self)
         self.leader = Communicator(Communicator.LEADER) 
         self.collaborator = Communicator(Communicator.COLLABORATOR)
-        # initiate the number of members 
         self.number_of_members = 0
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+    
+    def __str__(self) -> str:
+        return f"Instanciated a {self.__class__.__name__} class instance"
 
     def choose_the_rig(self):
         """
@@ -48,37 +59,29 @@ class Controller:
         """
         return 
 
-    def registration(self, timeout:int = 10, info_prints:bool = False) -> None: 
+    def registration(self, timeout:int = 10) -> None: 
 
-        if info_prints:
-            print("before registration: self.number_of_members = ", self.number_of_members)
-            print(get_host_ip())
-        ## first: create the request that will be sent to the members. 
+        print("before registration: self.number_of_members = ", self.number_of_members)
+        print(get_host_ip())
+
+        ## 1: create the request that will be sent to the members. 
         command = "registration" 
-        arguments = self.PC_PERSO_INFOS
+        arguments = self.CONTROLLER_INFOS
         request = create_json(command, arguments)
 
-        ## second: assert the communicator 
-        assert isinstance(self.leader.behavior, Leader)
+        ## 2: assert the communicator 
+        try: 
+            assert isinstance(self.leader.behavior, Leader)
+        except AssertionError:
+            self.leader.change_behavior(Communicator.LEADER)
 
-        ## third: set the socket for broadcast, send the request and wait for answers from members. 
-        # TODO: the timeout should be given to listen and not the set_socket function 
-        if info_prints:
-            print("[send/listen]")
+        ## 3: set the socket for broadcast, send the request and wait for answers from members. 
+        with self.collaborator.set_socket() as sock_tcp:   
+            ## 3.1: send the request
+            with self.leader.set_socket() as sock_udp: 
+                self.leader.send(request, sock_udp=sock_udp)
 
-        self.leader.set_socket(self, timeout, info_prints = True)
-
-
-
-        with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
-            # send request
-            with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
-                print("in the block")
-                self.leader.send(request, sock_udp = sock_udp, info_sent = True)
-                print("info sent")
-
-            # wait for answers
-            # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
+            ## 3.2: wait for answers
             while True:
                 try:
                     start_time = time.time()
@@ -196,9 +199,22 @@ class Controller:
 ## MAIN #####################################################################################################################################
 #############################################################################################################################################
 
-if __name__ == "__main__": 
-    # check the network
-    network_status()
+def main():
+    
+    logging.basicConfig(filename='communicator.log', encoding='utf-8', level=logging.DEBUG)
+    logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Started')
+    # could be changed 
     controller = Controller()
-    controller.registration(timeout=30)
-    # controller.aquire_images(delay = 1, number_of_images = 2)
+
+    logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Finished')
+
+if __name__ == "__main__": 
+    main()
+
+
+# if __name__ == "__main__": 
+    # # check the network
+    # network_status()
+    # controller = Controller()
+    # controller.registration(timeout=30)
+    # # controller.aquire_images(delay = 1, number_of_images = 2)

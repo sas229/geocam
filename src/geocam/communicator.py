@@ -359,13 +359,18 @@ class Communicator:
 # #############################################################################################################################################
 
 def main():
-    
+
     logging.basicConfig(filename='communicator.log', encoding='utf-8', level=logging.DEBUG)
     logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Started')
     # could be changed 
-    leader = Communicator(Communicator.LEADER)
-    with leader.set_socket() as s: 
-        leader.send("test", sock_udp=s)
+
+    # leader = Communicator(Communicator.LEADER)
+    # with leader.set_socket() as s: 
+    #     leader.send("test", sock_udp=s)
+
+    collaborator = Communicator(Communicator.COLLABORATOR)
+    with collaborator.set_socket() as s:
+        print(collaborator.listen(sock_tcp=s))
 
     logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Finished')
 
