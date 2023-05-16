@@ -48,10 +48,11 @@ class Controller:
         """
         return 
 
-    def registration(self, timeout:int = 10) -> None: 
+    def registration(self, timeout:int = 10, info_prints:bool = False) -> None: 
 
-        print("before registration: self.number_of_members = ", self.number_of_members)
-        print(get_host_ip())
+        if info_prints:
+            print("before registration: self.number_of_members = ", self.number_of_members)
+            print(get_host_ip())
         ## first: create the request that will be sent to the members. 
         command = "registration" 
         arguments = self.PC_PERSO_INFOS
@@ -62,7 +63,12 @@ class Controller:
 
         ## third: set the socket for broadcast, send the request and wait for answers from members. 
         # TODO: the timeout should be given to listen and not the set_socket function 
-        print("[send/listen]")
+        if info_prints:
+            print("[send/listen]")
+
+        self.leader.set_socket(self, timeout, info_prints = True)
+
+
 
         with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
             # send request
