@@ -11,7 +11,6 @@
 ## TODO's ###################################################################################################################################
 #############################################################################################################################################
 """ 
-1. Move the timeout from set_socket to listen 
 """
 
 #############################################################################################################################################
@@ -19,6 +18,7 @@
 #############################################################################################################################################
 
 import logging
+import inspect
 import os
 import platform
 import socket 
@@ -27,6 +27,25 @@ import time
 
 from geocam.communicator import *
 from geocam.utils import *
+
+#############################################################################################################################################
+## SETTING UP THE LOGGER ####################################################################################################################
+#############################################################################################################################################
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+
+file_handler = logging.FileHandler(f'{__file__[:-3]}.log', mode='w')
+# file_handler.setLevel(logging.ERROR)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 
 #############################################################################################################################################
@@ -41,10 +60,13 @@ class Controller:
     CONTROLLER_INFOS:dict = {"os_name":f"{os.name}", "plateform":f"{platform.system()}", "prefix":f"{get_host_name()[:3]}"}
 
     def __init__(self) -> None:
-        print(self)
+        
         self.leader = Communicator(Communicator.LEADER) 
         self.collaborator = Communicator(Communicator.COLLABORATOR)
-        self.number_of_members = 0
+        self.connection_info = {"ip_addr":get_host_ip(), "host_name":get_host_name()}
+        self.rpis_records = {}
+
+        logger.info(f"{self}")
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
@@ -61,19 +83,23 @@ class Controller:
 
     def registration(self, timeout:int = 10) -> None: 
 
-        print("before registration: self.number_of_members = ", self.number_of_members)
-        print(get_host_ip())
+        name_of_this_function = inspect.currentframe().f_code.co_name
+        logger.info(f"Starting {name_of_this_function}")
+        logger.debug(f"before {name_of_this_function}: self.rpis_records = {self.rpis_records}")
+        logger.debug(f"host_ip is {get_host_ip()}")
 
-        ## 1: create the request that will be sent to the members. 
-        command = "registration" 
-        arguments = self.CONTROLLER_INFOS
-        request = create_json(command, arguments)
-
-        ## 2: assert the communicator 
+        ## 1: assert the communicator 
         try: 
             assert isinstance(self.leader.behavior, Leader)
         except AssertionError:
             self.leader.change_behavior(Communicator.LEADER)
+            logger.exception("AssertionError occured")
+            # TODO: test this
+
+        ## 2: create the request that will be sent to the members. 
+        content = {"command":"registration", "arguments_or_response":self.CONTROLLER_INFOS}
+        request = create_json(source=self.connection_info, content=content)
+        logger.debug(f"request is: \n{request}")
 
         ## 3: set the socket for broadcast, send the request and wait for answers from members. 
         with self.collaborator.set_socket() as sock_tcp:   
@@ -82,23 +108,14 @@ class Controller:
                 self.leader.send(request, sock_udp=sock_udp)
 
             ## 3.2: wait for answers
-            while True:
-                try:
-                    start_time = time.time()
-                    data, addr = self.collaborator.listen(sock_tcp = sock_tcp, info_listen = True)
-                    if data: # this line basically tests if something was received 
-                        print("something received")
-                        print(data)
-                        self.number_of_members += 1
-                except TimeoutError:
-                    event_time = time.time()
-                    time_past = event_time - start_time
-                    print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
-                    break
-                else:
-                    break # in the current sate only one registration is possible TODO: change that 
+            for data, addr in self.collaborator.listen(sock_tcp=sock_tcp):
+                rpi_record = read_json(data)
+                self.rpis_records.update(rpi_record)
 
-        print("after registration: self.number_of_members = ", self.number_of_members)
+        logger.debug(f"after {name_of_this_function}: self.rpis_records = {self.rpis_records}")
+        logger.info(f"{name_of_this_function.capitalize()} completed")
+
+### Functions to be written
 
     def aquire_images(self, delay:int = 1, number_of_images:int = 2, timeout:int = 30) -> None:
 
@@ -177,8 +194,6 @@ class Controller:
                 else:
                     break # in the current sate only one registration is possible TODO: change that 
 
-### Functions to be written 
-
     def configure_cameras(self): 
         """
         - Configuration and contols of the camera, must dive in the picamera2-mannual for the pi cameras 
@@ -200,13 +215,8 @@ class Controller:
 #############################################################################################################################################
 
 def main():
-    
-    logging.basicConfig(filename='communicator.log', encoding='utf-8', level=logging.DEBUG)
-    logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Started')
-    # could be changed 
     controller = Controller()
-
-    logging.info(f'<{datetime.datetime.now().strftime("%H:%M:%S")}>'+'Finished')
+    controller.registration()
 
 if __name__ == "__main__": 
     main()

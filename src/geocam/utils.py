@@ -1,4 +1,5 @@
 import platform
+import os
 import json
 import subprocess
 import warnings
@@ -126,7 +127,7 @@ def network_status(remote_server:str = "google.com") -> str:
 ############################################################################################################################################# 
 
 # TODO: change create_json so it uses different key names in function of who is sending the file
-def create_json(command:str, arguments:dict) -> str:
+def create_json(source:str, content:dict) -> str:
     """_summary_
 
     Parameters
@@ -141,7 +142,7 @@ def create_json(command:str, arguments:dict) -> str:
     str
         string representing a JSON object
     """      
-    _dict = {"command":command ,"arguments":arguments}
+    _dict = {"source":source ,"content":content}
     return json.dumps(_dict, indent=2)
 
 def read_json(json_string:str) -> dict: 
@@ -253,3 +254,8 @@ def _change_all_tcp_ports(self, tcp_port:int) -> None:
         pass
     else:
         print("Invalid input.")
+
+if __name__ == "__main__":
+    source = {"ip_addr":get_host_ip(), "host_name":get_host_name()}
+    content = {"command":"registration", "arguments_or_response":{"os_name":f"{os.name}", "plateform":f"{platform.system()}", "prefix":f"{get_host_name()[:3]}"}}
+    print(read_json(create_json(source, content)))
