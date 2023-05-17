@@ -48,7 +48,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
@@ -112,7 +112,7 @@ class RPicamera():
                 request = read_json(data)
                 self.requests_history.append(request)
                 ## 2.2: execute the request 
-                with self.collaborator() as sock_tcp:
+                with self.collaborator.listen() as sock_tcp:
                     self.excecute(request=request, socket_tcp=sock_tcp)
 
         logger.debug(f"after {name_of_this_function}: self.requests_history = {self.requests_history}") 
