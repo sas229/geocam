@@ -64,7 +64,7 @@ class Controller:
         self.leader = Communicator(Communicator.LEADER) 
         self.collaborator = Communicator(Communicator.COLLABORATOR)
         self.connection_info = {"ip_addr":get_host_ip(), "host_name":get_host_name()}
-        self.rpis_records = {}
+        self.rpis_records = []
 
         logger.info(f"{self}")
 
@@ -97,12 +97,11 @@ class Controller:
             # TODO: test this
 
         ## 2: create the request that will be sent to the members. 
-        content = {"command":"registration", "arguments_or_response":self.CONTROLLER_INFOS}
+        content = {"command":"registration", "arguments_or_response":self.RPI_INFOS}
         request = create_json(source=self.connection_info, content=content)
-        logger.debug(f"request is: \n{request}")
-
+        
         ## 3: set the socket for broadcast, send the request and wait for answers from members. 
-        with self.collaborator.set_socket() as sock_tcp:   
+        with self.collaborator.set_socket(timeout) as sock_tcp:   
             ## 3.1: send the request
             with self.leader.set_socket() as sock_udp: 
                 self.leader.send(request, sock_udp=sock_udp)
@@ -110,58 +109,33 @@ class Controller:
             ## 3.2: wait for answers
             for data, addr in self.collaborator.listen(sock_tcp=sock_tcp):
                 rpi_record = read_json(data)
-                self.rpis_records.update(rpi_record)
+                self.rpis_records.append(rpi_record)
 
         logger.debug(f"after {name_of_this_function}: self.rpis_records = {self.rpis_records}")
         logger.info(f"{name_of_this_function.capitalize()} completed")
 
 ### Functions to be written
 
-    def aquire_images(self, delay:int = 1, number_of_images:int = 2, timeout:int = 30) -> None:
+    def capture_images(self, delay:int = 1, number_of_images:int = 2, timeout:int = 30) -> None:
 
-        self.registration()
+        self.registration(timeout=3)
 
-        print("[START CAPTURE]")
+        name_of_this_function = inspect.currentframe().f_code.co_name
+        logger.info(f"Starting {name_of_this_function}")
 
-        ## first: create the request that will be sent to the members. 
-        command = "capture_images" 
-        arguments = {"delay":delay , "number_of_images":number_of_images}
-        request = create_json(command, arguments)
+        content = {"command":"capture_images", "arguments_or_response":{"delay":delay , "number_of_images":number_of_images}}
+        request = create_json(source=self.connection_info, content=content) 
+ 
+        with self.collaborator.set_socket() as sock_tcp:   
+            
+            with self.leader.set_socket() as sock_udp: 
+                self.leader.send(request, sock_udp=sock_udp)
 
-        ## second: assert the communicator 
-        assert isinstance(self.leader.behavior, Leader)
+            for data, addr in self.collaborator.listen(sock_tcp=sock_tcp):
+                confirmation = read_json(data)
+                logger.debug(f"data received from pis {confirmation}")
 
-        ## third: set the socket for broadcast, send the request and wait for answers from members. 
-        # TODO: the timeout should be given to listen and not the set_socket function 
-        print("[send/listen]")
-
-        with self.collaborator.set_socket(timeout, info_set= False) as sock_tcp:
-            # send request
-            with self.leader.set_socket(timeout, info_set = False) as sock_udp: #timeout in seconds - info_set = True to print info  
-                print("in the block")
-                self.leader.send(request, sock_udp = sock_udp, info_sent = False)
-
-            # wait for answers
-            # TODO: use yield instead of return. this will allow to move the while and error handling in listen 
-            confirmations = 0
-            while True:
-                print(confirmations)
-                try:
-                    start_time = time.time()
-                    data, addr = self.collaborator.listen(sock_tcp = sock_tcp, info_listen = True)
-                    if data and confirmations < self.number_of_members: # this line basically tests if something was received 
-                        print("something received")
-                        print(data)
-                        print("confirmations")
-                except TimeoutError:
-                    event_time = time.time()
-                    time_past = event_time - start_time
-                    print(f"exited after {time_past} seconds. timeout was set to {timeout} seconds")
-                    break
-                else:
-                    break # in the current sate only one registration is possible TODO: change that 
-
-        print("[All have confirmed]")
+        logger.info(f"{name_of_this_function.capitalize()} completed")
 
     def get_video_stream(self, timeout:int = 10):
 
@@ -216,7 +190,8 @@ class Controller:
 
 def main():
     controller = Controller()
-    controller.registration()
+    # controller.registration()
+    controller.capture_images()
 
 if __name__ == "__main__": 
     main()

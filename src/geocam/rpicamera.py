@@ -25,8 +25,8 @@ import os
 import platform
 import socket
 import time 
-# if platform.system() == "Linux":
-    # from picamera2 import Picamera2
+if platform.system() == "Linux":
+    from picamera2 import Picamera2
     # import cv2
     # import  pyshine as ps
 
@@ -108,11 +108,12 @@ class RPicamera():
         ## 2: set a socket that will listen for requests
         with self.agent.set_socket() as sock_udp: 
             ## 2.1: catch the requests
-            for data, addr in self.agent.listen(sock_udp=sock_udp):
-                request = read_json(data)
-                self.requests_history.append(request)
-                ## 2.2: execute the request 
-                with self.collaborator.listen() as sock_tcp:
+            with self.collaborator.set_socket() as sock_tcp:
+                for data, addr in self.agent.listen(sock_udp=sock_udp):
+                    logger.debug("catching requests")
+                    request = read_json(data)
+                    self.requests_history.append(request)
+                    ## 2.2: execute the request 
                     self.excecute(request=request, socket_tcp=sock_tcp)
 
         logger.debug(f"after {name_of_this_function}: self.requests_history = {self.requests_history}") 
@@ -126,8 +127,14 @@ class RPicamera():
         content = request["content"]
 
         ## 2: do the requested job 
+
+        ## 2.1: registration job 
         if content["command"] == "registration":
             self._registration_job(source=source, arguments=content["arguments_or_response"], sock_tcp=socket_tcp)   
+
+        ## 2.2: capture job
+        if content["command"] == "capture_images":
+            self._capture_images(source=source, arguments=content["arguments_or_response"], sock_tcp=socket_tcp)
 
     def _registration_job(self, source:dict, arguments:dict, sock_tcp:socket.socket):
         
@@ -149,21 +156,44 @@ class RPicamera():
             content = {"command":"registration", "arguments_or_response":f"{name_of_this_function[1:]} completed"}
             message = create_json(self.connection_info, content)
             self.collaborator.send(message, sock_tcp=sock_tcp, target_ip=leader_ip_addr)
+        else: 
+            logger.debug(f"{get_host_name()} is not a member and will not send response to {leader_name} at ip addr {leader_ip_addr}")
 
+        logger.debug(f"{name_of_this_function[1:].capitalize()} completed")
+    
+    def _capture_images(self, source:dict, arguments:dict, sock_tcp:socket.socket):
+
+        name_of_this_function = inspect.currentframe().f_code.co_name
         logger.debug(f"Starting {name_of_this_function[1:]}")
 
-# # AQUIRE IMAGES 
-        # # NOTE: think of the storage of the images  
-        # if command == "capture_images":
-        #     print(f"{command} job")
-        #     picam2 = Picamera2()
-        #     # picam2.sensor_mode = 2
-        #     host_name = self.id_info["host_name"]
-        #     picam2.start_and_capture_files(f"{host_name}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
-        #     type_of_info = command
-        #     content = f"{command} job done"
-        #     message = create_json(type_of_info, content)
-        #     self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
+        ## 0: parsing source 
+        leader_ip_addr = source["ip_addr"]
+        leader_name = source["host_name"]
+
+        ## 1: capture the pictures
+        picam2 = Picamera2()
+        picam2.start_and_capture_files(f"{get_host_name()}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False)
+        logger.debug(f"{get_host_name()} is taking the pictures")
+        ## 1.1: creating a reponse
+        content = {"command":"capture_images", "arguments_or_response":"job started"}
+        message = create_json(self.connection_info, content)
+        self.collaborator.send(message, sock_tcp=sock_tcp, target_ip=leader_ip_addr)
+        logger.debug(f"{get_host_name()} has sent the confirmation about having started the job to {leader_name}")
+
+        logger.debug(f"{name_of_this_function[1:].capitalize()} completed")
+
+# # # AQUIRE IMAGES 
+#         # NOTE: think of the storage of the images  
+#         if command == "capture_images":
+#             print(f"{command} job")
+#             picam2 = Picamera2()
+#             # picam2.sensor_mode = 2
+#             host_name = self.id_info["host_name"]
+#             picam2.start_and_capture_files(f"{host_name}"+"_img{:03d}.jpg", initial_delay = 1, delay = arguments["delay"], num_files = arguments["number_of_images"], show_preview = False) 
+#             type_of_info = command
+#             content = f"{command} job done"
+#             message = create_json(type_of_info, content)
+#             self.collaborator.send(message, sock_tcp=socket_tcp, target_ip=addr[0], info_sent = False)
 
         # # CALIBRATE
         # if command == "stream":
