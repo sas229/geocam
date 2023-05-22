@@ -47,6 +47,7 @@ logger.addHandler(stream_handler)
 #############################################################################################################################################
 
 class Controller:
+    # TODO: add a way of specifying the target rig. Each target rig should have its own mcast group 
     """_summary_
     """    
 

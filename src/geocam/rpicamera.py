@@ -166,6 +166,10 @@ class RPicamera():
         logger.debug(f"{name_of_this_function[1:].capitalize()} completed")
     
     def _capture_images(self, source:dict, arguments:dict, sock_tcp:socket.socket):
+        # parse the information from leader
+        # start the capture - TODO: maybe with a confirmation of received order sent to the leader ? 
+        # queue the images when they are captured as memory buffers
+        # send these memory buffers to leader - TODO: final confirmation: job completed 
 
         name_of_this_function = inspect.currentframe().f_code.co_name
         logger.debug(f"Starting {name_of_this_function[1:]}")
