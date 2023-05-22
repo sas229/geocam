@@ -1,61 +1,108 @@
+import io
+import logging
+import time 
+from PIL import Image
+from picamera2 import Picamera2
 
+#############################################################################################################################################
+## SETTING UP THE LOGGER ####################################################################################################################
+#############################################################################################################################################
 
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
 
-def start_and_capture_files(self, name: str = "image{:03d}.jpg",
-                                initial_delay=1, preview_mode="preview",
-                                capture_mode="still", num_files=1, delay=1,
-                                show_preview=True):
-        """This function makes capturing multiple images more convenient.
+file_handler = logging.FileHandler(f'{__file__[:-3]}.log', mode='w')
+# file_handler.setLevel(logging.ERROR)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
-        Should only be used in command line line applications (not from a Qt application, for example).
-        If will configure the camera as requested and start it, switching between preview and still modes
-        for capture. It supports the following parameters (all optional):
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.DEBUG)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
-        name - name of the files to which to save the images. If more than one image is to be
-            captured then it should feature a format directive that will be replaced by a counter.
+#############################################################################################################################################
+## CLASS ####################################################################################################################################
+#############################################################################################################################################
 
-        initial_delay - any time delay (in seconds) before the first image is captured. The camera
-            will run in preview mode during this period. The default time is 1s.
+# picam2 = Picamera2()
+# capture_config = picam2.create_still_configuration()
+# picam2.configure(picam2.create_preview_configuration())
+# picam2.start()
 
-        preview_mode - the camera mode to use for the preview phase (defaulting to the
-            Picamera2 object's preview_configuration field).
+# time.sleep(1)
+# data = io.BytesIO()
+# picam2.switch_mode_and_capture_file(capture_config, data, format='jpeg')
+# print(data.getbuffer().nbytes)
 
-        capture_mode - the camera mode to use to capture the still images (defaulting to the
-            Picamera2 object's still_configuration field).
+# image = Image.open(data)
+# image.save("./image.jpg")
+# image.close()
 
-        num_files - number of files to capture (default 1).
+class GeoPicamera(Picamera2):
 
-        delay - the time delay for every capture after the first (default 1s).
+    def __init__(self):
+        super().__init__()
+        logger.debug(self.__str__())
 
-        show_preview - whether to show a preview window (default: yes). The preview window only
-            displays an image by default during the preview phase, so if captures are back-to-back
-            with delay zero, then there may be no images shown. This parameter only has any
-            effect if a preview is not already running. If it is, it would have to be stopped first
-            (with the stop_preview method).
-        """
+    def start_capture_and_send_images(self, name: str = "image{:03d}.jpg", initial_delay=1, preview_mode="preview", capture_mode="still", num_files=1, delay=1, show_preview=False):
+        
+        data = io.BytesIO()
+
+        # the two following will be useful for more detailed configuration 
+        preview_config = self.create_preview_configuration()
+        capture_config = self.create_still_configuration()
+
         if self.started:
             self.stop()
+
         if delay:
             # Show a preview between captures, so we will switch mode and back for each capture.
-            self.configure(preview_mode)
+            self.configure(preview_config)
             self.start(show_preview=show_preview)
+            
             for i in range(num_files):
                 time.sleep(initial_delay if i == 0 else delay)
-                self.switch_mode_and_capture_file(capture_mode, name.format(i))
+                # self.switch_mode_and_capture_file(capture_mode, name.format(i))
+                self.switch_mode_and_capture_file(capture_config, data, format='jpeg')
+                with Image.open(data) as image:
+                    image.save(name.format(i))
+
         else:
             # No preview between captures, it's more efficient just to stay in capture mode.
             if initial_delay:
-                self.configure(preview_mode)
+                self.configure(preview_config)
                 self.start(show_preview=show_preview)
                 time.sleep(initial_delay)
-                self.switch_mode(capture_mode)
+                # self.switch_mode(capture_config['usage_mode'])
+                self.switch_mode(capture_config)
+
+                # self.configure(self.create_preview_configuration())
+                # self.start()
+                # time.sleep(initial_delay)
+                # self.switch_mode(capture_mode)
+
             else:
-                self.configure(capture_mode)
+                self.configure(capture_config)
                 self.start(show_preview=show_preview)
+
+                # self.configure(self.create_preview_configuration())
+                # self.start()
+
             for i in range(num_files):
-                self.capture_file(name.format(i))
+                # self.capture_file(name.format(i))
+                self.capture_file(data, format='jpeg')
+                with Image.open(data) as image:
+                    image.save(name.format(i))
                 if i == num_files - 1:
                     break
                 time.sleep(delay)
         self.stop()
+
+
+if __name__ == '__main__':
+    camera = GeoPicamera()
+    camera.start_capture_and_send_images(initial_delay=0, delay=0, num_files=1)
+    

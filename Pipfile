@@ -20,7 +20,7 @@ sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
 colorama = "*"
-pillow = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.9.2"
