@@ -4,7 +4,8 @@ import time
 import queue
 import struct
 import threading
-from geocam.communicator import Communicator
+import socket 
+
 from PIL import Image
 from picamera2 import Picamera2
 
@@ -15,7 +16,7 @@ from picamera2 import Picamera2
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(thread)d:%(message)s')
 
 file_handler = logging.FileHandler(f'{__file__[:-3]}.log', mode='w')
 file_handler.setLevel(logging.DEBUG)
@@ -38,20 +39,24 @@ max_queue_size = 10
 # Step 1: Define the stop flag
 stop_thread = False
 
-leader_ip_addr = '172.20.10.2'
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_address = ('172.20.10.2', 1645)
+sock.connect(server_address)
+
 def send_images():
-    collaborator = Communicator(Communicator.COLLABORATOR)
-    time.sleep(5)
     logger.info("sleeping*****")
+    time.sleep(5)
+    logger.info("done sleeping*****")
     while True: 
-        with collaborator.set_socket() as sock_tcp:
-            if not image_queue.empty():
-                data = image_queue.get()  # Retrieve buffer from image_queue
-                image_size = data.getbuffer().nbytes
-                collaborator.send(struct.pack('!I', image_size), sock_tcp=sock_tcp, target_ip=leader_ip_addr)
-                collaborator.send(data.getvalue())
-            if stop_thread:
-                break
+        if not image_queue.empty():
+            logger.info("QUEUE")
+            data = image_queue.get()  # Retrieve buffer from image_queue
+            image_size = data.getbuffer().nbytes
+            sock.sendall(struct.pack('!I', image_size))
+            sock.sendall(data.getvalue())
+        if stop_thread:
+            logger.info("BREAK")
+            break
 
 class GeoPicamera(Picamera2):
 
@@ -113,6 +118,7 @@ if __name__ == '__main__':
     camera.start_capture_and_send_images(initial_delay=0, delay=1, num_files=2)
 
     stop_thread = True
+    sock.close()
     sending_thread.join()
 
     
