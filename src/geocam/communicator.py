@@ -453,7 +453,7 @@ class Collaborator(Behavior):
     
     # test up to date. TODO: rethink the layout to make it that client can also listen and that servers can send info 
     # TODO this test can be better with more cases: test the network, test the error handlings
-    def _send(self, message:str = None, sock_tcp:socket.socket = None, target_ip:str = None) -> None:
+    def _send(self, message:bytes = None, sock_tcp:socket.socket = None, target_ip:str = None) -> None:
         """
         Send a message over a TCP socket to a specified target IP address.
 
@@ -494,7 +494,7 @@ class Collaborator(Behavior):
             except TimeoutError:
                 logger.exception("Timeout occured")
                 break
-            sock_tcp.sendall(bytes(message, 'utf-8'))
+            sock_tcp.sendall(message)
             logger.info("The message was sent to %s", target_address)
             break
 
