@@ -8,27 +8,17 @@
 """
 
 #############################################################################################################################################
-## TODO's ###################################################################################################################################
-#############################################################################################################################################
-""" 
-1. Add some asserts 
-2. Code the loggings 
-"""
-
-#############################################################################################################################################
 ## IMPORTS ##################################################################################################################################
 #############################################################################################################################################
 
+import logging
 import json
 import inspect
 import os 
 import platform
 import socket
 import time 
-if platform.system() == "Linux":
-    from picamera2 import Picamera2
-    # import cv2
-    # import  pyshine as ps
+import sys
 
 from geocam.communicator import *
 from geocam.utils import *
@@ -36,29 +26,43 @@ from geocam.utils import *
 #############################################################################################################################################
 ## SETTING UP THE LOGGER ####################################################################################################################
 #############################################################################################################################################
-
-logger = logging.getLogger()
+# see https://docs.python.org/3/library/logging.html for documentation on logging
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
-
+# create a file handler that logs the debug messages
 file_handler = logging.FileHandler(f'{__file__[:-3]}.log', mode='w')
-# file_handler.setLevel(logging.ERROR)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+file_handler.setLevel(logging.ERROR)
 
+# create a stream handler to print the errors in console
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
+
+# format the handlers 
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:%(message)s')
+file_handler.setFormatter(formatter)
 stream_handler.setFormatter(formatter)
+
+# add the handlers to logger
+logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
+#############################################################################################################################################
+## CONDITIONAL IMPORT #######################################################################################################################
+#############################################################################################################################################
 
+try:
+    from picamera2 import Picamera2
+    # import cv2
+    # import  pyshine as ps
+except ImportError:
+    if not get_host_name().startswith("rp"):
+        logger.critical("This module is intended to be used on the Raspberry Pi OS")
+        sys.exit()
+
+print('test')
 #############################################################################################################################################
 ## CLASS ####################################################################################################################################
 #############################################################################################################################################
-
-if platform.system() != "Linux" and not get_host_name().startswith("rp"):
-    logger.critical("This module is intended to be used on the Raspberry Pi OS")
 
 class RPicamera(): 
 
@@ -251,10 +255,11 @@ class RPicamera():
 
 if __name__ == "__main__": 
     # TODO: change the network_status function - so it returns info usable to start or not the process
-    rpicamera = RPicamera()
-    rpicamera.stand_by_for_request(timeout=10)
+    # rpicamera = RPicamera()
+    # rpicamera.stand_by_for_request(timeout=10)
     # request = read_json(create_json("capture_images", {"delay":1 , "number_of_images":2}))
     # rpicamera.excecute(request)
+    pass
 
     
 

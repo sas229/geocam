@@ -1,11 +1,48 @@
-import platform
-import os
-import json
-import subprocess
-import warnings
+"""
+:Name: communicator
+:Description: This module is used for the various communication operations
+:Date: 2023-05-03
+:Version: 0.0.1
+:Author(s): Hilario Greggi, Sam Stanier, Zewen Wang, Wenhan Du, Barry Lehane
+
+"""
+
+#############################################################################################################################################
+## IMPORTS ##################################################################################################################################
+#############################################################################################################################################
+
 import getmac
+import json
+import logging
+import os
+import platform
+import subprocess
 
 from geocam.communicator import *
+
+#############################################################################################################################################
+## SETTING UP THE LOGGER ####################################################################################################################
+#############################################################################################################################################
+# see https://docs.python.org/3/library/logging.html for documentation on logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+
+# create a file handler that logs the debug messages
+file_handler = logging.FileHandler(f'{__file__[:-3]}.log', mode='w')
+file_handler.setLevel(logging.DEBUG)
+
+# create a stream handler to print the errors in console
+stream_handler = logging.StreamHandler()
+
+# format the handlers 
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(funcName)s:%(message)s')
+file_handler.setFormatter(formatter)
+stream_handler.setFormatter(formatter)
+
+# add the handlers to logger
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 #############################################################################################################################################
 ## FUNCTIONS ################################################################################################################################
@@ -13,249 +50,326 @@ from geocam.communicator import *
 
 ## Get informations on machine ##############################################################################################################
 ############################################################################################################################################# 
- 
+
+# test up to date
 def get_host_name() -> str: 
-    """No very useful but might become useful, if not discard it
-
-    Returns
-    -------
-    str
-        _description_
     """
-    return socket.gethostname()
-    
-def get_host_ip() -> str:
-    """Gets the host IP address
+    Returns the hostname of the current machine.
 
     Returns
     -------
     str
-        IP address
-    """        
+        The hostname of the current machine.
+    """
+    host_name = socket.gethostname()
+
+    # Logging the host_name before returning
+    logging.info("Current hostname: %s", host_name)
+
+    return host_name
+
+# test up to date be careful with the test from mac os  
+def get_host_ip() -> str:
+    """
+    Returns the IP address of the current machine.
+
+    Returns
+    -------
+    str
+        The hostname of the current machine.
+
+    Raises
+    ------
+    OSError
+        If the IP address could not be retreived.
+    """  
+    host_ip = None
+
     if platform.system().lower() == 'windows':
-        return socket.gethostbyname(socket.gethostname())
-    else: 
+        host_ip = socket.gethostbyname(socket.gethostname())
+    elif platform.system().lower() == 'linux': 
         routes = json.loads(os.popen("ip -j -4 route").read())
         for r in routes:
             if r.get("dev") == "wlan0" and r.get("prefsrc"):
                 host_ip = r['prefsrc']
-                continue
-        return host_ip 
-    
+                break 
+    elif platform.system().lower() == 'darwin': 
+        host_ip = os.popen("ipconfig getifaddr en0").read()
+
+    if host_ip is None:
+        raise OSError("Failed to retrieve the IP address.")
+    logging.info("Current IP address: %s", host_ip)
+    return host_ip 
+
+
 def get_mac_address() -> str:
-    return getmac.get_mac_address()
-    
-## Network diagnostic #######################################################################################################################
-############################################################################################################################################# 
-    
-def ping(target:str) -> bool:
-    """This method is used to ping the network
-
-    Parameters
-    ----------
-    host : str
-        Host to ping 
-
-    Returns
-    -------
-    bool
-        True if we have an answer or False if no answer
-    """        
-    param = '-n' if platform.system().lower()=='windows' else '-c'
-    try:
-        subprocess.check_output(["ping", param, "1", target], stderr=subprocess.STDOUT)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-        
-def is_local_ip_address(host_ip:str) -> bool: 
-    """_summary_
-
-    Parameters
-    ----------
-    host_ip : str
-        _description_
-
-    Returns
-    -------
-    bool
-        _description_
-    """        
-    if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
-        return True
-    else: 
-        return False 
-        
-def network_status(remote_server:str = "google.com") -> str:
-    """_summary_
-    3 status possible: 
-    - status_1: the device is not on a network
-    - status_2: the device is on a network with no access to internet 
-    - status_3: the device is on a network with access to internet 
-
-    Parameters
-    ----------
-    remote_server : str, optional
-        Sexternal server that the device will try to reach to test the internet connection, 
-        by default "google.com"
-
     """
-
-    is_the_ip_local = is_local_ip_address(get_host_ip())
-    is_internet_connected = ping(remote_server)
-
-    # status_1 : Warning : Not on a network
-    if not is_internet_connected and is_the_ip_local :
-        warnings.warn("This device isn't connected to a network", stacklevel=2)
-        return "no_network"
-        
-    # status_2 : Warning : No access to internet
-    elif not is_internet_connected and not is_the_ip_local: 
-        warnings.warn("No access to internet", stacklevel=2)
-        return "wlan_and_no_internet"
-
-    # status_3 : Warning : Access to internet
-    elif is_internet_connected and not is_the_ip_local:
-        warnings.warn("Access to internet", stacklevel=2)
-        return "wlan_and_internet"
-    
-    # undifined configuration
-    else:
-        raise NotImplementedError("Undifined - the ip is the local one but access to internet")
-
-## Create JSON ##############################################################################################################################
-############################################################################################################################################# 
-
-# TODO: change create_json so it uses different key names in function of who is sending the file
-def create_json(source:str, content:dict) -> str:
-    """_summary_
-
-    Parameters
-    ----------
-    command : str
-        _description_
-    arguments : str
-        _description_
+    Returns the MAC address of the current machine.
 
     Returns
     -------
     str
-        string representing a JSON object
-    """      
-    _dict = {"source":source ,"content":content}
-    return json.dumps(_dict, indent=2)
+        The MAC address of the current machine.
+    """
+    mac_addr = getmac.get_mac_address()
+    logging.info("Current mac_addr: %s", mac_addr)
+    return mac_addr
 
-def read_json(json_string:str) -> dict: 
-    """Don't do much for now but might become usefull later
+## Checks on IP address  ####################################################################################################################
+############################################################################################################################################# 
+
+def is_local_ip_address(host_ip:str) -> bool: 
+    """
+    Checks if the given IP address is a local address.
 
     Parameters
     ----------
-    json_string : str
-        _description_
+    host_ip : str
+        The IP address to check.
 
     Returns
     -------
-    dict
-        _description_
-    """
-    return json.loads(json_string) 
-
-## Check if the ip is valid #################################################################################################################
-############################################################################################################################################# 
-
-# TODO: check if these work fine 
+    bool
+        True if the IP address is a local address, False otherwise.
+    """         
+    if host_ip == host_ip.startswith('127.') or host_ip == socket.gethostbyname('localhost'):
+        logging.info("IP address %s is a local address.", host_ip)
+        return True
+    else: 
+        logging.info("IP address %s is not a local address.", host_ip)
+        return False 
 
 def is_valid_ipv4(ip: str) -> bool:
+    """
+    Checks if the given IPv4 address is valid.
+
+    Parameters
+    ----------
+    ip : str
+        The IPv4 address to check.
+
+    Returns
+    -------
+    bool
+        True if the IPv4 address is valid, False otherwise.
+
+    """
     parts = ip.split('.')
     if len(parts) != 4:
+        logging.info("Invalid IPv4 address: %s", ip)
         return False
     for part in parts:
         if not part.isdigit() or not 0 <= int(part) <= 255:
+            logging.info("Invalid IPv4 address: %s", ip)
             return False
+    logging.info("Valid IPv4 address: %s", ip)
     return True
 
 def is_valid_ipv6(ip: str) -> bool:
+    """
+    Checks if the given IPv6 address is valid.
+
+    Parameters
+    ----------
+    ip : str
+        The IPv6 address to check.
+
+    Returns
+    -------
+    bool
+        True if the IPv6 address is valid, False otherwise.
+
+    """
     parts = ip.split(':')
     if len(parts) > 8:
+        logging.info("Invalid IPv6 address: %s", ip)
         return False
     for part in parts:
         if not (1 <= len(part) <= 4) or not all(c in '0123456789abcdefABCDEF' for c in part):
+            logging.info("Invalid IPv6 address: %s", ip)
             return False
+    logging.info("Valid IPv6 address: %s", ip)
     return True
 
 def is_valid_ip(ip: str) -> bool:
-    return is_valid_ipv4(ip) or is_valid_ipv6(ip)
+    """
+    Checks if the given IP address is valid (IPv4 or IPv6).
 
+    Parameters
+    ----------
+    ip : str
+        The IP address to check.
+
+    Returns
+    -------
+    bool
+        True if the IP address is valid (IPv4 or IPv6), False otherwise.
+
+    """
+    if is_valid_ipv4(ip) or is_valid_ipv6(ip):
+        logging.info("Valid IP address: %s", ip)
+        return True
+    else:
+        logging.info("Invalid IP address: %s", ip)
+        return False
+    
 ## Check if a port is occupied ##############################################################################################################
 #############################################################################################################################################
 
 def is_port_free(port: int) -> bool:
+    """
+    Checks if the given port is free.
+
+    Parameters
+    ----------
+    port : int
+        The port number to check.
+
+    Returns
+    -------
+    bool
+        True if the port is free, False otherwise.
+
+    """
     if platform.system() == "Windows":
         command = f"netstat -ano | findstr :{port}"
     else:
         command = f"lsof -i :{port}"
 
     try:
-        result = subprocess.check_output(command, shell=True)
+        subprocess.check_output(command, shell=True)
+        logging.info("Port %d is not free.", port)
         return False
     except subprocess.CalledProcessError:
+        logging.info("Port %d is free.", port)
         return True
-    
-## List of available ports that can be used see: https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
-ports_candidates_for_TCP_protocol = [1645, 1646, 4944, 5000, 5500, 9600, 10000, 20000, 11100, 19788]
-ports_candidates_for_UDP_protocol = [1965, 3001, 3128, 5070, 5678, 8006, 8008, 8010, 8089, 8448]
 
 def get_free_port(candidates):
+    """
+    Finds and returns a list of free ports from the given candidates.
+
+    Parameters
+    ----------
+    candidates : list
+        A list of port numbers to check.
+
+    Returns
+    -------
+    list
+        A list of free port numbers.
+
+    """
     result = []
     for port in candidates:
         if is_port_free(port):
             result.append(port)
+    logging.info("Free ports: %s", result)
     return result
 
-## Connection variables #####################################################################################################################
+## Network diagnostic #######################################################################################################################
+############################################################################################################################################# 
+    
+def ping(target:str) -> bool:
+    """
+    Pings the specified target and returns whether it is reachable or not.
+
+    Parameters
+    ----------
+    target : str
+        The target to ping.
+
+    Returns
+    -------
+    bool
+        True if the target is reachable, False otherwise.
+    """          
+    param = '-n' if platform.system().lower()=='windows' else '-c'
+    try:
+        subprocess.check_output(["ping", param, "1", target], stderr=subprocess.STDOUT)
+        logging.info("Target %s is reachable.", target)
+        return True
+    except subprocess.CalledProcessError:
+        logging.info("Target %s is not reachable.", target)
+        return False
+               
+def network_status(remote_server:str = "google.com") -> int:
+    """
+    Checks the network status of the device.
+
+    Parameters
+    ----------
+    remote_server : str, optional
+        The remote server to ping for checking internet connectivity. Default is "google.com".
+
+    Returns
+    -------
+    str
+        The network status:
+        - 0 if the device is not connected to a network.
+        - -1 if the device is connected to a WLAN but has no internet access.
+        - 1 if the device is connected to a WLAN and has internet access.
+
+    Raises
+    ------
+    NotImplementedError
+        If the IP address is local but there is access to the internet.
+
+    """
+    is_the_ip_local = is_local_ip_address(get_host_ip())
+    is_internet_connected = ping(remote_server)
+
+    if not is_internet_connected and is_the_ip_local:
+        logging.warning("This device isn't connected to a network")
+        return 0
+    elif not is_internet_connected and not is_the_ip_local:
+        logging.warning("On local network with no access to internet")
+        return -1
+    elif is_internet_connected and not is_the_ip_local:
+        logging.warning("Access to internet")
+        return 1
+    else:
+        raise NotImplementedError("Undefined - the IP is the local one but there is access to the internet")
+
+## Create JSON ##############################################################################################################################
 ############################################################################################################################################# 
 
-def _change_mcast_grp(self, mcast_grp:str) -> None:
-        warnings.warn("This will permanently change the mcast_grp address used by this instance of communicator.", stacklevel=2)
-        answer = input("Do you want to continue? (y/n) ")
-        if answer.lower() in ["y", "yes"]:
-            self.behavior.MCAST_GRP = mcast_grp
-        elif answer.lower() in ["n", "no"]:
-            pass
-        else:
-            print("Invalid input.")
+def create_json(source:str, content:dict) -> str:
+    """
+    Creates a JSON string from the given source and content.
 
-def _change_all_mcast_grps(self, mcast_grp:str) -> None:
-    warnings.warn("This will permanently change the mcast_grp address used by all instances of communicators on this machine. Please make sure that this change is also made on all members of the mcast_grp.", stacklevel=2)
-    answer = input("Do you want to continue? (y/n) ")
-    if answer.lower() in ["y", "yes"]:
-        Behavior.MCAST_GRP = mcast_grp
-    elif answer.lower() in ["n", "no"]:
-        pass
-    else:
-        print("Invalid input.")
+    Parameters
+    ----------
+    source : str
+        The source of the JSON data.
+    content : dict
+        The content of the JSON data.
 
-def _change_all_mcast_ports(self, mcast_port:int) -> None:
-    warnings.warn("This will permanently change the mcast_port used by all instances of communicators on this machine.", stacklevel=2)
-    answer = input("Do you want to continue? (y/n) ")
-    if answer.lower() in ["y", "yes"]:
-        Behavior.MCAST_PORT = mcast_port
-    elif answer.lower() in ["n", "no"]:
-        pass
-    else:
-        print("Invalid input.")
+    Returns
+    -------
+    str
+        The JSON string representation of the source and content.
 
-def _change_all_tcp_ports(self, tcp_port:int) -> None:
-    warnings.warn("This will permanently change the tcp_port used by all instances of communicators on this machine.", stacklevel=2)
-    answer = input("Do you want to continue? (y/n) ")
-    if answer.lower() in ["y", "yes"]:
-        Behavior.TCP_PORT = tcp_port
-    elif answer.lower() in ["n", "no"]:
-        pass
-    else:
-        print("Invalid input.")
+    """    
+    _dict = {"source":source ,"content":content}
+    json_string = json.dumps(_dict, indent=2)
+    logging.info("Created JSON string: %s", json_string)
+    return json_string
 
-if __name__ == "__main__":
-    source = {"ip_addr":get_host_ip(), "host_name":get_host_name()}
-    content = {"command":"registration", "arguments_or_response":{"os_name":f"{os.name}", "plateform":f"{platform.system()}", "prefix":f"{get_host_name()[:3]}"}}
-    print(read_json(create_json(source, content)))
+def read_json(json_string:str) -> dict: 
+    """
+    Reads a JSON string and returns a dictionary.
+
+    Parameters
+    ----------
+    json_string : str
+        The JSON string to read.
+
+    Returns
+    -------
+    dict
+        The dictionary representation of the JSON data.
+
+    """
+    data = json.loads(json_string)
+    logging.info("Read JSON data: %s", data)
+    return data 
