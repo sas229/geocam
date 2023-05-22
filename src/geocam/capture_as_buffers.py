@@ -27,3 +27,7 @@ image.save("./image.jpg")
 plt.imshow(image)
 plt.show()
 image.close()
+
+name = "image{:03d}.jpg"
+with Image.open(data) as image:
+    image.save(name.format(i))
