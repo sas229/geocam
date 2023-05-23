@@ -1,19 +1,22 @@
 import socket 
 import struct
 import traceback
+import time
+import io
 
 from PIL import Image
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.settimeout(20)
 
-server_address = ('', 1645)
+server_address = ('172.20.10.2', 1645)
 sock.bind(server_address)
 
-sock.listen(1)
+sock.listen()
 
 name = "image{:03d}.jpg"
 image_num = 0
+
 while True:
     # Wait for a connection
     print('Waiting for a connection...')
@@ -21,11 +24,20 @@ while True:
     print('Connection established !')
     try:
         # Receive the image size
+        print('Waiting for data')
+        current_time = time.time()
         image_size_data = connection.recv(4)
+        current_time2 = time.time()
+        waited_time = current_time2 - current_time
+        print("Waited %s seconds", waited_time)
+        print(type(image_size_data))
         if len(image_size_data) != 4:
+            print(len(image_size_data))
             print("Error: Incomplete or incorrect data received.")
         else:
             image_size = struct.unpack('!I', image_size_data)[0]
+            print("horay!!")
+            print()
         # image_size = struct.unpack('!I', image_size_data)[0]
 
         # Receive the image data
@@ -33,12 +45,14 @@ while True:
         
         while len(image_data) < image_size:
             data = connection.recv(image_size - len(image_data))
-            print("data", data)
+            # print("data", data)
             if not data:
                 break
             image_data += data
-            
-        with Image.open(data) as image:
+        print(len(image_data))
+        byte_stream = io.BytesIO(image_data)
+
+        with Image.open(byte_stream) as image:
             image.save(name.format(image_num))
 
         image_num += 1
@@ -47,13 +61,14 @@ while True:
     
     except KeyboardInterrupt:
         print('Key board Interrupted')
+        connection.close()
 
     except TimeoutError:
         print('Timeout')
+        connection.close()
 
     except Exception as e:
         traceback.print_exc()
+        # connection.close()
         
-    finally:
-        connection.close()
 
