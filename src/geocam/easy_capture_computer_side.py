@@ -20,10 +20,8 @@ image_num = 0
 print('Waiting for a connection...')
 connection, client_address = sock.accept()
 print('Connection established !')
-counter = 0
+
 while True:
-    # Wait for a connection
-    counter += 1
     try:
         # Receive the image size
         print('Waiting for data')
@@ -62,7 +60,7 @@ while True:
         byte_stream.close()
 
         # print("image_data", image_data)
-        if counter == 5:
+        if not data:
             break
     
     except KeyboardInterrupt:

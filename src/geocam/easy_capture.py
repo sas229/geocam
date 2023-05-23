@@ -100,6 +100,9 @@ class GeoPicamera(Picamera2):
             
             for i in range(num_files):
                 time.sleep(initial_delay if i == 0 else delay)
+                # Reset data_buffer
+                data_buffer.seek(0)
+                data_buffer.truncate()
                 
                 with data_lock:
                     self.switch_mode_and_capture_file(capture_config, data_buffer, format='jpeg')
@@ -119,6 +122,10 @@ class GeoPicamera(Picamera2):
                 self.start(show_preview=show_preview)
 
             for i in range(num_files):
+                # Reset data_buffer
+                data_buffer.seek(0)
+                data_buffer.truncate()
+
                 with data_lock:
                     self.capture_file(data_buffer, format='jpeg')
                     data_copy = io.BytesIO(data_buffer.getvalue())
@@ -144,7 +151,7 @@ if __name__ == '__main__':
     sending_thread.start()
 
     camera = GeoPicamera()
-    camera_thread = threading.Thread(target=camera.start_capture_and_send_images, kwargs={'initial_delay': 2, 'delay': 1, 'num_files': 5})
+    camera_thread = threading.Thread(target=camera.start_capture_and_send_images, kwargs={'initial_delay': 2, 'delay': 1, 'num_files': 10})
     camera_thread.daemon = True
     camera_thread.start()
 
