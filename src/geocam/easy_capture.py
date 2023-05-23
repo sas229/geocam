@@ -39,9 +39,6 @@ max_queue_size = 10
 # Create a lock for data 
 data_lock = threading.Lock()
 
-# Creating the buffer variable. None initially to have a clean plate
-data_buffer = None
-
 # Step 1: Define the stop flag
 stop_thread = False
 
@@ -55,14 +52,12 @@ def send_images():
     global sock
     
     logger.info("THIS IS THE VALUE OF STOP THREAD %s", stop_thread)
-    # logger.info("sleeping*****")
-    # time.sleep(5)
-    # logger.info("done sleeping*****")
     while True: 
-
         if not data_queue.empty():
             logger.info("QUEUE")
+            logger.info("%s ELEMENTS ARE QUEUED IN THE QUEUE", data_queue.qsize())
             data = data_queue.get()  # Retrieve buffer from data_queue
+            logger.info("%s ELEMENTS ARE QUEUED IN THE QUEUE AFTER GET", data_queue.qsize())
             logger.info("CHECK1")
             image_size = data.getbuffer().nbytes
             logger.info("image_size %s", image_size)
@@ -75,7 +70,6 @@ def send_images():
             # Close the data_copy object to release resources
             data.close()
             logger.info("THIS IS THE VALUE OF STOP THREAD NOW %s", stop_thread)
-
         if stop_thread:
             logger.info("BREAK")
             break
@@ -86,9 +80,9 @@ class GeoPicamera(Picamera2):
         super().__init__()
         logger.debug(self.__str__())
 
-    def start_capture_and_send_images(self, name: str = "image{:03d}.jpg", initial_delay=1, num_files=1, delay=1, show_preview=False):
-        global data_buffer
+    def start_capture_and_send_images(self, initial_delay=1, num_files=1, delay=1, show_preview=False):
         global data_queue
+        global data_lock
 
         # the two following will be useful for more detailed configuration 
         preview_config = self.create_preview_configuration()
@@ -97,46 +91,46 @@ class GeoPicamera(Picamera2):
         if self.started:
             self.stop()
 
-        with data_lock:
-            logger.info("IN LOCK")
+        data_buffer = io.BytesIO()
 
-            data_buffer = io.BytesIO()
-
-            if delay:
-                # Show a preview between captures, so we will switch mode and back for each capture.
-                self.configure(preview_config)
-                self.start(show_preview=show_preview)
+        if delay:
+            # Show a preview between captures, so we will switch mode and back for each capture.
+            self.configure(preview_config)
+            self.start(show_preview=show_preview)
+            
+            for i in range(num_files):
+                time.sleep(initial_delay if i == 0 else delay)
                 
-                for i in range(num_files):
-                    time.sleep(initial_delay if i == 0 else delay)
-                    # self.switch_mode_and_capture_file(capture_mode, name.format(i))
+                with data_lock:
                     self.switch_mode_and_capture_file(capture_config, data_buffer, format='jpeg')
                     data_copy = io.BytesIO(data_buffer.getvalue())
                     data_queue.put(data_copy)
 
+        else:
+            # No preview between captures, it's more efficient just to stay in capture mode.
+            if initial_delay:
+                self.configure(preview_config)
+                self.start(show_preview=show_preview)
+                time.sleep(initial_delay)
+                self.switch_mode(capture_config)
+                
             else:
-                # No preview between captures, it's more efficient just to stay in capture mode.
-                if initial_delay:
-                    self.configure(preview_config)
-                    self.start(show_preview=show_preview)
-                    time.sleep(initial_delay)
-                    self.switch_mode(capture_config)
-                    
-                else:
-                    self.configure(capture_config)
-                    self.start(show_preview=show_preview)
+                self.configure(capture_config)
+                self.start(show_preview=show_preview)
 
-                for i in range(num_files):
+            for i in range(num_files):
+                with data_lock:
                     self.capture_file(data_buffer, format='jpeg')
                     data_copy = io.BytesIO(data_buffer.getvalue())
                     data_queue.put(data_copy)
-                    
-                    if i == num_files - 1:
-                        break
-                    time.sleep(delay)
+                
+                if i == num_files - 1:
+                    break
+                time.sleep(delay)
 
-            # Reset the data buffer for the next order 
-            data_buffer = None
+            # Release the data buffer
+            data_buffer.close()
+
             logger.info("the queue is not empty %s", not data_queue.empty())
             logger.info("OUT OF LOCK")
 
@@ -150,11 +144,13 @@ if __name__ == '__main__':
     sending_thread.start()
 
     camera = GeoPicamera()
-    camera.start_capture_and_send_images(initial_delay=1, delay=0.5, num_files=2)
+    camera_thread = threading.Thread(target=camera.start_capture_and_send_images, kwargs={'initial_delay': 2, 'delay': 1, 'num_files': 5})
+    camera_thread.daemon = True
+    camera_thread.start()
 
+    camera_thread.join()
     stop_thread = True
     sending_thread.join()
-    logger.info("CHANGING THE STOP THREAD")
     sock.close()
 
     

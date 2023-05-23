@@ -17,11 +17,13 @@ sock.listen()
 name = "image{:03d}.jpg"
 image_num = 0
 
+print('Waiting for a connection...')
+connection, client_address = sock.accept()
+print('Connection established !')
+counter = 0
 while True:
     # Wait for a connection
-    print('Waiting for a connection...')
-    connection, client_address = sock.accept()
-    print('Connection established !')
+    counter += 1
     try:
         # Receive the image size
         print('Waiting for data')
@@ -49,6 +51,7 @@ while True:
             if not data:
                 break
             image_data += data
+        
         print(len(image_data))
         byte_stream = io.BytesIO(image_data)
 
@@ -56,8 +59,11 @@ while True:
             image.save(name.format(image_num))
 
         image_num += 1
+        byte_stream.close()
 
         # print("image_data", image_data)
+        if counter == 5:
+            break
     
     except KeyboardInterrupt:
         print('Key board Interrupted')
@@ -69,6 +75,6 @@ while True:
 
     except Exception as e:
         traceback.print_exc()
-        # connection.close()
+        break
         
 
