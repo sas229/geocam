@@ -51,9 +51,14 @@ def send_images():
         if not image_queue.empty():
             logger.info("QUEUE")
             data = image_queue.get()  # Retrieve buffer from image_queue
+            logger.info("CHECK1")
             image_size = data.getbuffer().nbytes
+            logger.info("CHECK2")
+            logger.info("THIS IS IMAGE SIZE %s", image_size)
             sock.sendall(struct.pack('!I', image_size))
+            logger.info("CHECK3")
             sock.sendall(data.getvalue())
+            logger.info("CHECK4")
         if stop_thread:
             logger.info("BREAK")
             break
@@ -115,7 +120,7 @@ if __name__ == '__main__':
     sending_thread.start()
 
     camera = GeoPicamera()
-    camera.start_capture_and_send_images(initial_delay=0, delay=1, num_files=2)
+    camera.start_capture_and_send_images(initial_delay=0, delay=0, num_files=1)
 
     stop_thread = True
     sock.close()
