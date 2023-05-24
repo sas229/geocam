@@ -80,7 +80,7 @@ class GeoPicamera(Picamera2):
         super().__init__()
         logger.debug(self.__str__())
 
-    def start_capture_and_send_images(self, initial_delay=1, num_files=1, delay=1, show_preview=False):
+    def start_capture_and_send_images(self, initial_delay=1, num_files=2, delay=5, show_preview=False):
         global data_queue
         global data_lock
 
@@ -92,11 +92,17 @@ class GeoPicamera(Picamera2):
             self.stop()
 
         data_buffer = io.BytesIO()
+        
+        logger.info("initial_delay %s", initial_delay)
+        logger.info("num_files %s", num_files)
+        logger.info("delay %s", delay)
+
 
         if delay:
             # Show a preview between captures, so we will switch mode and back for each capture.
             self.configure(preview_config)
             self.start(show_preview=show_preview)
+            target_delay = delay
             
             for i in range(num_files):
                 time.sleep(initial_delay if i == 0 else delay)
@@ -105,9 +111,17 @@ class GeoPicamera(Picamera2):
                 data_buffer.truncate()
                 
                 with data_lock:
+                    current_time = time.time()
                     self.switch_mode_and_capture_file(capture_config, data_buffer, format='jpeg')
                     data_copy = io.BytesIO(data_buffer.getvalue())
                     data_queue.put(data_copy)
+                
+                delay_elapsed = time.time() - current_time
+                delay = max(0, target_delay - delay_elapsed)
+                logger.info("Time delay due to the lock %s", delay_elapsed)
+                logger.info("Updated delay that takes it in account %s", delay)
+                effective_delay = delay + delay_elapsed
+                logger.info("Effective delay after correction %s", effective_delay)
 
         else:
             # No preview between captures, it's more efficient just to stay in capture mode.
@@ -135,6 +149,8 @@ class GeoPicamera(Picamera2):
                     break
                 time.sleep(delay)
 
+                logger.info("Time between captures %s", dela_t)
+
             # Release the data buffer
             data_buffer.close()
 
@@ -151,7 +167,7 @@ if __name__ == '__main__':
     sending_thread.start()
 
     camera = GeoPicamera()
-    camera_thread = threading.Thread(target=camera.start_capture_and_send_images, kwargs={'initial_delay': 2, 'delay': 1, 'num_files': 10})
+    camera_thread = threading.Thread(target=camera.start_capture_and_send_images, kwargs={'initial_delay': 5, 'delay': 10, 'num_files': 3})
     camera_thread.daemon = True
     camera_thread.start()
 

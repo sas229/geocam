@@ -31,13 +31,14 @@ while True:
         waited_time = current_time2 - current_time
         print("Waited %s seconds", waited_time)
         print(type(image_size_data))
+        if len(image_size_data) == 0:
+            break
         if len(image_size_data) != 4:
             print(len(image_size_data))
             print("Error: Incomplete or incorrect data received.")
         else:
             image_size = struct.unpack('!I', image_size_data)[0]
             print("horay!!")
-            print()
         # image_size = struct.unpack('!I', image_size_data)[0]
 
         # Receive the image data
