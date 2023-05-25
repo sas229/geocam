@@ -11,6 +11,7 @@ import cv2
 import queue
 import numpy as np
 
+from cv2 import aruco 
 from http import server
 from threading import Condition
 from geocam.utils import get_host_ip
@@ -73,8 +74,10 @@ class StreamingOutput(io.BufferedIOBase):
 original_queue = queue.Queue()
 processed_queue = queue.Queue()
 
+
 # Function to process the frame
 def process_frame():
+    relative_time = 0
     logging.debug("3. in process frame")
     frequency = 0.5
     last_process_time = time.time()
@@ -82,14 +85,18 @@ def process_frame():
         if not original_queue.empty():
             frame = original_queue.get()  # Retrieve a frame from the original queue
             current_time = time.time()
-            if current_time - last_process_time >= frequency:
+            delta_t = current_time - last_process_time
+            relative_time += delta_t
+            if delta_t >= frequency:
                 last_process_time = current_time
+                logging.debug("RELATIVE TIME IS: %s", relative_time)
                 logging.debug("5. in process frame")
                 frame = original_queue.get()  # Retrieve a frame from the original queue
                 logging.debug("6. original frame will be processed")
                 # Perform frame processing (e.g., convert to grayscale)
                 decoded_frame = cv2.imdecode(np.frombuffer(frame, dtype=np.uint8), cv2.IMREAD_COLOR) # Decode the frame
-                processed_frame = cv2.cvtColor(decoded_frame, cv2.COLOR_BGR2GRAY)
+                # processed_frame = cv2.cvtColor(decoded_frame, cv2.COLOR_BGR2GRAY)
+                processed_frame = estimate_image_quality(decoded_frame, round(relative_time, 2))
                 _, processed_frame_encoded = cv2.imencode('.jpg', processed_frame) # Encode the processed frame
                 processed_queue.put(processed_frame_encoded.tobytes())  # Put the processed frame into the processed queue
                 logging.debug("7. original was processed")
@@ -153,46 +160,134 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
+#############################################################################################################################################
+## PROCESS DATA FUNCTIONS ###################################################################################################################
+#############################################################################################################################################
 
-picam2 = Picamera2()
-picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
-output = StreamingOutput()
-picam2.start_recording(JpegEncoder(), FileOutput(output))
-logging.debug("1. just after starting")
 
-try:
-    # Start the frame processing thread
-    logging.debug("2. just before processing_thread")
-    processing_thread = threading.Thread(target=process_frame)
-    processing_thread.daemon = True
-    processing_thread.start()
-    logging.debug("4. processing_thread should have started")
+def add_quality_index_text(frame, index_text, corners_were_found) -> np.ndarray:
 
-    address = ('', 8000)
-    server = StreamingServer(address, StreamingHandler)
+    if not corners_were_found: 
+        index_text = f"PLEASE CHANGE THE FOCUS \nNO CORNER WERE FOUND \nPLEASE CHANGE THE FOCUS"
+    
+    _, image_width = frame.shape[:2]
 
-    # Start the server in a separate thread
-    server_thread = threading.Thread(target=server.serve_forever)
-    server_thread.daemon = True
-    server_thread.start()
-    print(f"streaming at http://{get_host_ip()}:8000/")
+    rectangle_width = int(image_width * 0.6)
+    rectangle_height = int(3/12 *rectangle_width)
 
-    # Wait for a keyboard interrupt to stop the server
-    print("Press Ctrl+C to stop the server.")
-    while True:
-        try:
-            time.sleep(1)
-        except KeyboardInterrupt:
-            break
+    x = image_width - rectangle_width  # Calculate the x-coordinate of the top-left corner of the rectangle
+    y = 0                              # Set the y-coordinate of the top-left corner of the rectangle
 
-except Exception as e:
-    logging.warning('Server error: %s', str(e))
+    cv2.rectangle(frame, (x, y), (x + rectangle_width, y + rectangle_height), (0, 0, 0), -1)
 
-finally:
-    logging.debug("just before closing")
-    picam2.stop_recording()
-    # Stop the frame processing thread and gracefully shutdown the server
-    processing_thread.join()
-    server.shutdown()
-    server.server_close()
+    thickness = int(10/3000 * image_width)
+    fontScale = 3/14 * thickness
+
+    # dealing with the text
+    lines = index_text.split('\n')
+    # print(lines)
+    set_line_height = int(rectangle_height/3) # Set the line height to the text height plus some additional spacing
+    # print(set_line_height)
+    y_offset = int(set_line_height*0.7) # Set the initial y-coordinate for the first line
+
+    for line in lines:
+        # print(line)
+        # print("y_offset before updated", y_offset)
+        # Calculate the size of the current line
+        (line_width, _) = cv2.getTextSize(line, fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=fontScale, thickness=thickness)[0]
+        # print(line_width, _)
+        # Calculate the x-coordinate for centering the current line
+        x_offset = x + (rectangle_width - line_width) // 2
+        # print(x_offset)
+        # Draw the current line
+        cv2.putText(img=frame, text=line, org=(x_offset, y_offset), fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=fontScale, color=(255, 0, 0), thickness=thickness)
+        # Update the y-coordinate for the next line
+        y_offset += set_line_height
+        # print("y_offset after updated", y_offset)
+
+    return frame
+
+def estimate_image_quality(frame, current_time) -> np.ndarray:
+    # initiated to false
+    corners_were_found = 0 
+
+    # create the board, aruco_dict could become a paramter if a different dictionnary is used
+    aruco_dict = aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
+    horizontal_number_of_squares = 44
+    vertical_number_of_squares = 28
+    charuco_board = aruco.CharucoBoard_create(horizontal_number_of_squares, vertical_number_of_squares, 5/3, 1, aruco_dict)
+
+    # compute the ma number of detectable charuco corners 
+    max_num_of_detectable_charuco_corners = (horizontal_number_of_squares - 1) * (vertical_number_of_squares - 1) 
+
+    # process: detect aruco and charuco corners 
+    image_in_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    params = aruco.DetectorParameters_create()
+    corners, ids, rejectedImgPoints = aruco.detectMarkers(image_in_gray, aruco_dict, parameters = params)
+
+    if len(corners) > 0:
+        logging.info("CORNER FOUND")
+        retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, image_in_gray, charuco_board)
+        corners_were_found = 1
+        num_detected_corners = len(charuco_corners)
+        quality_index = round(num_detected_corners / max_num_of_detectable_charuco_corners, 3)
+        index_text = f"TIME :: {current_time} \nDETECTED\MAX_DETECTABLE :: {num_detected_corners}\\{max_num_of_detectable_charuco_corners} \nQUALITY INDEX :: {quality_index}"
+        
+        # post process: draw croners 
+        if retval:
+            aruco.drawDetectedCornersCharuco(image_in_gray, charuco_corners, charuco_ids)
+
+    
+    # add the quality index text
+    processed_gray_image = add_quality_index_text(image_in_gray, index_text, corners_were_found)
+
+    return processed_gray_image
+
+#############################################################################################################################################
+## MAIN #####################################################################################################################################
+#############################################################################################################################################
+
+if __name__ == "__main__":
+
+    picam2 = Picamera2()
+    picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
+    output = StreamingOutput()
+    picam2.start_recording(JpegEncoder(), FileOutput(output))
+    logging.debug("1. just after starting")
+
+    try:
+        # Start the frame processing thread
+        logging.debug("2. just before processing_thread")
+        processing_thread = threading.Thread(target=process_frame)
+        processing_thread.daemon = True
+        processing_thread.start()
+        logging.debug("4. processing_thread should have started")
+
+        address = ('', 8000)
+        server = StreamingServer(address, StreamingHandler)
+
+        # Start the server in a separate thread
+        server_thread = threading.Thread(target=server.serve_forever)
+        server_thread.daemon = True
+        server_thread.start()
+        print(f"streaming at http://{get_host_ip()}:8000/")
+
+        # Wait for a keyboard interrupt to stop the server
+        print("Press Ctrl+C to stop the server.")
+        while True:
+            try:
+                time.sleep(1)
+            except KeyboardInterrupt:
+                break
+
+    except Exception as e:
+        logging.warning('Server error: %s', str(e))
+
+    finally:
+        logging.debug("just before closing")
+        picam2.stop_recording()
+        # Stop the frame processing thread and gracefully shutdown the server
+        processing_thread.join()
+        server.shutdown()
+        server.server_close()
 

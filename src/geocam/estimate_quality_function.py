@@ -116,5 +116,5 @@ if __name__ == "__main__":
     image2 = r"..\images\curved.jpg"
     image3 = r"..\images\relatively_flat.jpg"
     
-    estimate_image_quality(image3)
+    estimate_image_quality(image1)
 
