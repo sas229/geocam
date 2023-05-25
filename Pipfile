@@ -11,6 +11,8 @@ mock = "*"
 numpy = "*"
 pillow = "==8.1.2"
 opencv-python = "==4.5.1.48"
+opencv-contrib-python = "==4.5.1.48"
+glob2 = "*"
 
 [dev-packages]
 build = "*"
