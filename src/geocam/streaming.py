@@ -165,11 +165,8 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
 #############################################################################################################################################
 
 
-def add_quality_index_text(frame, index_text, corners_were_found) -> np.ndarray:
+def add_quality_index_text(frame, index_text) -> np.ndarray:
 
-    if not corners_were_found: 
-        index_text = f"PLEASE CHANGE THE FOCUS \nNO CORNER WERE FOUND \nPLEASE CHANGE THE FOCUS"
-    
     _, image_width = frame.shape[:2]
 
     rectangle_width = int(image_width * 0.6)
@@ -209,7 +206,7 @@ def add_quality_index_text(frame, index_text, corners_were_found) -> np.ndarray:
 
 def estimate_image_quality(frame, current_time) -> np.ndarray:
     # initiated to false
-    corners_were_found = 0 
+    index_text = f"PLEASE CHANGE THE FOCUS \nNO CORNER WERE FOUND \nPLEASE CHANGE THE FOCUS"
 
     # create the board, aruco_dict could become a paramter if a different dictionnary is used
     aruco_dict = aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
@@ -225,21 +222,23 @@ def estimate_image_quality(frame, current_time) -> np.ndarray:
     params = aruco.DetectorParameters_create()
     corners, ids, rejectedImgPoints = aruco.detectMarkers(image_in_gray, aruco_dict, parameters = params)
 
-    if len(corners) > 0:
-        logging.info("CORNER FOUND")
+    if corners:
+        logging.info("ARUCOS FOUND")
         retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, image_in_gray, charuco_board)
-        corners_were_found = 1
-        num_detected_corners = len(charuco_corners)
-        quality_index = round(num_detected_corners / max_num_of_detectable_charuco_corners, 3)
-        index_text = f"TIME :: {current_time} \nDETECTED\MAX_DETECTABLE :: {num_detected_corners}\\{max_num_of_detectable_charuco_corners} \nQUALITY INDEX :: {quality_index}"
-        
-        # post process: draw croners 
+
         if retval:
+            logging.info("CORNER INTERPOLATION SUCCESSFUL")
+            # post process: compute the quality index  
+            num_detected_corners = len(charuco_corners)
+            quality_index = round(num_detected_corners / max_num_of_detectable_charuco_corners, 3)
+            index_text = f"TIME :: {current_time} \nDETECTED\MAX_DETECTABLE :: {num_detected_corners}\\{max_num_of_detectable_charuco_corners} \nQUALITY INDEX :: {quality_index}"
+            
+            # post process: draw corners 
             aruco.drawDetectedCornersCharuco(image_in_gray, charuco_corners, charuco_ids)
 
     
     # add the quality index text
-    processed_gray_image = add_quality_index_text(image_in_gray, index_text, corners_were_found)
+    processed_gray_image = add_quality_index_text(image_in_gray, index_text)
 
     return processed_gray_image
 
