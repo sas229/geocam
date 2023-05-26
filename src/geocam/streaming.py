@@ -79,8 +79,9 @@ processed_queue = queue.Queue()
 def process_frame():
     relative_time = 0
     logging.debug("3. in process frame")
-    frequency = 0.5
+    frequency = 0.2
     last_process_time = time.time()
+    max_num_of_detected_charuco_corners = 1
     while True:
         if not original_queue.empty():
             frame = original_queue.get()  # Retrieve a frame from the original queue
@@ -96,7 +97,8 @@ def process_frame():
                 # Perform frame processing (e.g., convert to grayscale)
                 decoded_frame = cv2.imdecode(np.frombuffer(frame, dtype=np.uint8), cv2.IMREAD_COLOR) # Decode the frame
                 # processed_frame = cv2.cvtColor(decoded_frame, cv2.COLOR_BGR2GRAY)
-                processed_frame = estimate_image_quality(decoded_frame, round(relative_time, 2))
+                processed_frame, new_num_of_detected_charuco_corners = estimate_image_quality(decoded_frame, round(relative_time, 2), max_num_of_detected_charuco_corners)
+                max_num_of_detected_charuco_corners = new_num_of_detected_charuco_corners
                 _, processed_frame_encoded = cv2.imencode('.jpg', processed_frame) # Encode the processed frame
                 processed_queue.put(processed_frame_encoded.tobytes())  # Put the processed frame into the processed queue
                 logging.debug("7. original was processed")
@@ -177,7 +179,7 @@ def add_quality_index_text(frame, index_text) -> np.ndarray:
 
     cv2.rectangle(frame, (x, y), (x + rectangle_width, y + rectangle_height), (0, 0, 0), -1)
 
-    thickness = int(10/3000 * image_width)
+    thickness = int(9/3000 * image_width)
     fontScale = 3/14 * thickness
 
     # dealing with the text
@@ -204,9 +206,12 @@ def add_quality_index_text(frame, index_text) -> np.ndarray:
 
     return frame
 
-def estimate_image_quality(frame, current_time) -> np.ndarray:
+def estimate_image_quality(frame, current_time, previous_max_num_of_detected_charuco_corners:int = 1) -> np.ndarray:
     # initiated to false
     index_text = f"PLEASE CHANGE THE FOCUS \nNO CORNER WERE FOUND \nPLEASE CHANGE THE FOCUS"
+
+    # initiated to the previous one
+    updated_max_num_of_detected_charuco_corners = previous_max_num_of_detected_charuco_corners
 
     # create the board, aruco_dict could become a paramter if a different dictionnary is used
     aruco_dict = aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
@@ -214,8 +219,8 @@ def estimate_image_quality(frame, current_time) -> np.ndarray:
     vertical_number_of_squares = 28
     charuco_board = aruco.CharucoBoard_create(horizontal_number_of_squares, vertical_number_of_squares, 5/3, 1, aruco_dict)
 
-    # compute the ma number of detectable charuco corners 
-    max_num_of_detectable_charuco_corners = (horizontal_number_of_squares - 1) * (vertical_number_of_squares - 1) 
+    # # compute the ma number of detectable charuco corners 
+    # max_num_of_detectable_charuco_corners = (horizontal_number_of_squares - 1) * (vertical_number_of_squares - 1) 
 
     # process: detect aruco and charuco corners 
     image_in_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -224,14 +229,19 @@ def estimate_image_quality(frame, current_time) -> np.ndarray:
 
     if corners:
         logging.info("ARUCOS FOUND")
+
+        # look for charuco corners 
         retval, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(corners, ids, image_in_gray, charuco_board)
 
         if retval:
             logging.info("CORNER INTERPOLATION SUCCESSFUL")
-            # post process: compute the quality index  
             num_detected_corners = len(charuco_corners)
-            quality_index = round(num_detected_corners / max_num_of_detectable_charuco_corners, 3)
-            index_text = f"TIME :: {current_time} \nDETECTED\MAX_DETECTABLE :: {num_detected_corners}\\{max_num_of_detectable_charuco_corners} \nQUALITY INDEX :: {quality_index}"
+            
+            if num_detected_corners > previous_max_num_of_detected_charuco_corners:
+                updated_max_num_of_detected_charuco_corners = num_detected_corners
+            
+            quality_index = round(num_detected_corners / updated_max_num_of_detected_charuco_corners, 2)
+            index_text = f"TIME :: {current_time} \nDETECTED\HISTORICAL_MAX :: {num_detected_corners}\\{updated_max_num_of_detected_charuco_corners} \nQUALITY INDEX :: {quality_index}"
             
             # post process: draw corners 
             aruco.drawDetectedCornersCharuco(image_in_gray, charuco_corners, charuco_ids)
@@ -240,7 +250,7 @@ def estimate_image_quality(frame, current_time) -> np.ndarray:
     # add the quality index text
     processed_gray_image = add_quality_index_text(image_in_gray, index_text)
 
-    return processed_gray_image
+    return processed_gray_image, updated_max_num_of_detected_charuco_corners
 
 #############################################################################################################################################
 ## MAIN #####################################################################################################################################
