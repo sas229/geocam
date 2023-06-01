@@ -179,7 +179,7 @@ def add_quality_index_text(frame, index_text) -> np.ndarray:
 
     cv2.rectangle(frame, (x, y), (x + rectangle_width, y + rectangle_height), (0, 0, 0), -1)
 
-    thickness = int(9/3000 * image_width)
+    thickness = int(10/3000 * image_width)
     fontScale = 3/14 * thickness
 
     # dealing with the text
