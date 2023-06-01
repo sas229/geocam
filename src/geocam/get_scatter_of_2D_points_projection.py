@@ -89,10 +89,10 @@ def get_scatter_of_2D_points_projection(input_image_dir: str,
 
     # Read the input image
     input_image = cv2.imread(input_image_dir)
-    image_size = input_image.shape
-    print("image_size", image_size)
-    # add a logger here 
     image_in_gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
+    image_size = image_in_gray.shape
+    print("image_size", image_size)
+    # add a logger here shape is (height, width, 3) for color images and (height, width) for gray images
     
 
     # Process: Detect charuco corners
