@@ -14,7 +14,7 @@ sock.bind(server_address)
 
 sock.listen()
 
-name = "image{:03d}.jpg"
+name = "rp1_config_5_img{:03d}.jpg"
 image_num = 0
 
 print('Waiting for a connection...')

@@ -94,7 +94,6 @@ def get_scatter_of_2D_points_projection(input_image_dir: str,
     print("image_size", image_size)
     # add a logger here shape is (height, width, 3) for color images and (height, width) for gray images
     
-
     # Process: Detect charuco corners
     retval, charuco_corners, charuco_ids = detect_charuco_corners(image_in_gray, charuco_dictionary, charuco_board)
     
@@ -122,10 +121,10 @@ def get_scatter_of_2D_points_projection(input_image_dir: str,
 if __name__ == "__main__":
     directory = r"C:\Users\hilar\Documents\project\geocam\src\images\calibration_img_example.jpg"
     retval, charuco_corners, charuco_ids, charuco_board, image_size = get_scatter_of_2D_points_projection(input_image_dir = directory, flag2=True)
-    print(type(retval))
-    print(type(charuco_corners))
-    print(type(charuco_ids))
-    print(type(charuco_board))
-    print(charuco_board)
-    print(type(image_size))
-    print(image_size)
+    # print(type(retval))
+    # print(type(charuco_corners))
+    # print(type(charuco_ids))
+    # print(type(charuco_board))
+    # print(charuco_board)
+    # print(type(image_size))
+    # print(image_size)

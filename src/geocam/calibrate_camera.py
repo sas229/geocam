@@ -270,27 +270,28 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
     # initial_camera_matrix = np.array([[ 1000.,    0., image_size[0]/2.],
     #                              [    0., 1000., image_size[1]/2.],
     #                              [    0.,    0.,           1.]])
-    # distCoeffsInit = np.zeros((5,1))
+    distCoeffsInit = np.zeros((5,1))
 
     initial_camera_matrix = np.array([[ 3.62916898e+03,    0., 1.58513866e+03],
                                  [    0., 3.77369633e+03, 2.10494246e+03],
                                  [    0.,    0.,           1.]])
-    distCoeffsInit = np.array([[-9.26873347e+00], [ 4.06241122e+01],  
-                               [-2.26419530e-03],  [-4.22193723e-03], 
-                               [ 3.57866539e+01], [-8.76263182e+00], 
-                                [ 3.53185405e+01], [ 6.07663413e+01], 
-                                [ 0.00000000e+00], [ 0.00000000e+00], 
-                                [ 0.00000000e+00],  [ 0.00000000e+00], 
-                                [ 0.00000000e+00], [ 0.00000000e+00]])
+    # distCoeffsInit = np.array([[-9.26873347e+00], [ 4.06241122e+01],  
+    #                            [-2.26419530e-03],  [-4.22193723e-03], 
+    #                            [ 3.57866539e+01], [-8.76263182e+00], 
+    #                             [ 3.53185405e+01], [ 6.07663413e+01], 
+    #                             [ 0.00000000e+00], [ 0.00000000e+00], 
+    #                             [ 0.00000000e+00],  [ 0.00000000e+00], 
+    #                             [ 0.00000000e+00], [ 0.00000000e+00]])
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 0.001)
 
     # Call the calibrateCamera function with the initial camera matrix flag
+    calibrate_camera_results = {}
     # cv2.CALIB_ZERO_TANGENT_DIST
     # cv2.CALIB_RATIONAL_MODEL 
     # cv2.CALIB_THIN_PRISM_MODEL
     # cv2.CALIB_TILTED_MODEL
-    flags = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_RATIONAL_MODEL 
+    flags = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_RATIONAL_MODEL
     retval, cameraMatrix, distCoeffs, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, perViewErrors = cv2.calibrateCameraExtended(objectPoints = object_points, 
                                                                          imagePoints = image_points, 
                                                                          imageSize = image_size,
@@ -298,6 +299,13 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
                                                                          distCoeffs = distCoeffsInit,
                                                                          flags=flags,
                                                                          criteria=criteria)
+    
+    calibrate_camera_results.update({"retval":retval, "cameraMatrix":cameraMatrix,
+                    "distCoeffs":distCoeffs, "rvecs":rvecs, "tvecs":tvecs,
+                    "stdDeviationsIntrinsics":stdDeviationsIntrinsics,
+                    "stdDeviationsExtrinsics":stdDeviationsExtrinsics,
+                    "perViewErrors":perViewErrors})
+
 
     # plotting the camera position
     rotation_matrix, _ = cv2.Rodrigues(rvecs[0])
@@ -339,22 +347,114 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
     if flag3:
         # TODO: a dict 
         names = ["fx","fy","cx","cy","k1","k2","p1","p2","k3","k4","k5","k6","s1","s2","s3","s4","τx","τy"]
+        
+        # focal lengths 
         mean_fx = cameraMatrix[0,0]
-        print(mean_fx)
         std_dev_fx = stdDeviationsIntrinsics[0]
+        cov_fx_percentage = abs(std_dev_fx[0]/mean_fx*100)
         mean_fy = cameraMatrix[1,1]
-        print(mean_fy)
         std_dev_fy = stdDeviationsIntrinsics[1]
+        cov_fy_percentage = abs(std_dev_fy[0]/mean_fy*100)
 
-        fig = plt.figure()
-        plot_probality_density_function(mean_fx, std_dev_fx, names[0])
-        plot_probality_density_function(mean_fy, std_dev_fy, names[1])
+        # position of the principal point 
+        mean_cx = cameraMatrix[0,2]
+        std_dev_cx = stdDeviationsIntrinsics[2]
+        cov_cx_percentage = abs(std_dev_cx[0]/mean_cx*100)
+        mean_cy = cameraMatrix[1,2]
+        std_dev_cy = stdDeviationsIntrinsics[3]
+        cov_cy_percentage = abs(std_dev_cy[0]/mean_cy*100)
 
+        # distortion coefficints 
+        # k1
+        mean_k1 = distCoeffs[0][0]
+        std_dev_k1 = stdDeviationsIntrinsics[4]
+        cov_k1_percentage = abs(std_dev_k1[0]/mean_k1*100)
+       
+        # k2
+        mean_k2 = distCoeffs[1][0]
+        std_dev_k2 = stdDeviationsIntrinsics[5]
+        cov_k2_percentage = abs(std_dev_k2[0]/mean_k2*100)
+        
+        # p1
+        mean_p1 = distCoeffs[2][0]
+        print("DDDD", mean_p1)
+        std_dev_p1 = stdDeviationsIntrinsics[6]
+        cov_p1_percentage = abs(std_dev_p1[0]/mean_p1*100)
+        
+        # p2
+        mean_p2 = distCoeffs[3][0]
+        print("DDDD", mean_p2)
+        std_dev_p2 = stdDeviationsIntrinsics[7]
+        cov_p2_percentage = abs(std_dev_p2[0]/mean_p2*100)
+        
+        # k3
+        mean_k3 = distCoeffs[4][0]
+        std_dev_k3 = stdDeviationsIntrinsics[8]
+        cov_k3_percentage = abs(std_dev_k3[0]/mean_k3*100)
+        
+        # k4
+        # mean_k4 = distCoeffs[5][0]
+        # std_dev_k4 = stdDeviationsIntrinsics[9]
+        # cov_k4_percentage = abs(std_dev_k4[0]/mean_k4*100)
+        
+        # # k5
+        # mean_k5 = distCoeffs[6][0]
+        # std_dev_k5 = stdDeviationsIntrinsics[10]
+        # cov_k5_percentage = abs(std_dev_k5[0]/mean_k5*100)
+        
+        # # k6
+        # mean_k6 = distCoeffs[7][0]
+        # std_dev_k6 = stdDeviationsIntrinsics[11]
+        # cov_k6_percentage = abs(std_dev_k6[0]/mean_k6*100)
+        
+        
+        fig1 = plt.figure("Focal lengths")
+        plot_probality_density_function(mean_fx, std_dev_fx, f'{names[0]}, {round(mean_fx)}, {round(std_dev_fx[0])}, {round(cov_fx_percentage, 2)}%')
+        plot_probality_density_function(mean_fy, std_dev_fy, f'{names[1]}, {round(mean_fy)}, {round(std_dev_fy[0])}, {round(cov_fy_percentage, 2)}%')
+        plt.show()
 
+        fig2 = plt.figure("Principal point")
+        plot_probality_density_function(mean_cx, std_dev_cx, f'{names[2]}, {round(mean_cx)}, {round(std_dev_cx[0])}, {round(cov_cx_percentage, 2)}%')
+        plot_probality_density_function(mean_cy, std_dev_cy, f'{names[3]}, {round(mean_cy)}, {round(std_dev_cy[0])}, {round(cov_cy_percentage, 2)}%')
+        plt.show()
 
-    
+        fig3 = plt.figure("Distorsion coefficients")
+        plot_probality_density_function(mean_k1, std_dev_k1, f'{names[4]}, {round(mean_k1)}, {round(std_dev_k1[0])}, {round(cov_k1_percentage, 2)}%')
+        plt.show()
+
+        fig4 = plt.figure("Distorsion coefficients")
+        plot_probality_density_function(mean_k2, std_dev_k2, f'{names[5]}, {round(mean_k2)}, {round(std_dev_k2[0])}, {round(cov_k2_percentage, 2)}%')
+        plt.show()
+
+        fig5 = plt.figure("Distorsion coefficients")
+        plot_probality_density_function(mean_p1, std_dev_p1, f'{names[6]}, {round(mean_p1)}, {round(std_dev_p1[0])}, {round(cov_p1_percentage, 2)}%')
+        plt.show()
+
+        fig6 = plt.figure("Distorsion coefficients")
+        plot_probality_density_function(mean_p2, std_dev_p2, f'{names[7]}, {round(mean_p2)}, {round(std_dev_p2[0])}, {round(cov_p2_percentage, 2)}%')
+        plt.show()
+
+        fig7= plt.figure("Distorsion coefficients")
+        plot_probality_density_function(mean_k3, std_dev_k3, f'{names[8]}, {round(mean_k3)}, {round(std_dev_k3[0])}, {round(cov_k3_percentage, 2)}%')
+        # plot_probality_density_function(mean_k4, std_dev_k4, f'{names[9]}, {round(mean_k4)}, {round(std_dev_k4[0])}, {round(cov_k4_percentage, 2)}%')
+        # plot_probality_density_function(mean_k5, std_dev_k5, f'{names[10]}, {round(mean_k5)}, {round(std_dev_k5[0])}, {round(cov_k5_percentage, 2)}%')
+        # plot_probality_density_function(mean_k6, std_dev_k6, f'{names[3]}, {round(mean_k6)}, {round(std_dev_cy[0])}, {round(cov_k6_percentage, 2)}%')
+        plt.show()
+
     return retval, cameraMatrix, distCoeffs, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, perViewErrors
 
+def plot_3d_points_and_camera(results_calibrate_camera: dict, flag1:bool = False, flag2:bool = False, flag3:bool = False):
+    # TODO: make some plots 
+    retval = results_calibrate_camera["retval"]
+    cameraMatrix = results_calibrate_camera["cameraMatrix"]
+    distCoeffs = results_calibrate_camera["distCoeffs"] 
+    rvecs = results_calibrate_camera["rvecs"] 
+    tvecs = results_calibrate_camera["tvecs"] 
+    stdDeviationsIntrinsics = results_calibrate_camera["stdDeviationsIntrinsics"] 
+    stdDeviationsExtrinsics = results_calibrate_camera["stdDeviationsExtrinsics"] 
+    perViewErrors = results_calibrate_camera["perViewErrors"]
+
+        
 
 def plot_probality_density_function(mean:float, std_dev:float, param:str):
 
@@ -365,12 +465,18 @@ def plot_probality_density_function(mean:float, std_dev:float, param:str):
     y = norm.pdf(x, mean, std_dev)
 
     # Plot the normal distribution
-    plt.plot(x, y)
-    plt.xlabel('x')
+    plt.plot(x, y, label = f'{param}')
+    plt.xlabel('data')
     plt.ylabel('Probability density')
-    plt.title(f'Normal Distribution {param}')
+    plt.title('Normal Distributions')
+    plt.legend()
     plt.grid(True)
-    plt.show()
+    
+
+#############################################################################################################################################
+## Main #####################################################################################################################################
+#############################################################################################################################################
+
 
 if __name__ == "__main__":
     coord_3D_points = get_cloud_of_3d_points()
