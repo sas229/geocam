@@ -115,6 +115,9 @@ def plot_3d_points(coords_3d_points: dict, flag: bool = False):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    ax.axes.set_xlim3d(left=-250, right=250) 
+    ax.axes.set_ylim3d(bottom=-250, top=250) 
+    ax.axes.set_zlim3d(bottom=-250, top=250) 
     ax.set_title('Cloud of 3D points')
     plt.axis('equal')
     plt.show()
@@ -238,33 +241,60 @@ def stack_points(model_coord_filterd, px_coord):
     return model_coord, px_Coord
 
 
-def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = False, flag3: bool = False):
+def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, flag2: bool = False, flag3: bool = False):
+
+    # Get the calibration images
+    calibration_images_directories = glob.glob(input_calibration_images_dir)
+    print(calibration_images_directories)
 
     # Sample input for objectPoints (3D points in the real world) and imagePoints (2D points captured by the camera)
-
-    # match 3D points and 2D projection of these points 
-    cloud_of_3d_points_dict = get_cloud_of_3d_points()
-    retval, coords_2d_projections_dict, image_size = get_scatter_of_2D_points_projection(input_image_dir = input_image_dir)
-    cloud_of_3d_points_dict_filtered = filter_cloud_of_3d_points(cloud_of_3d_points_dict, coords_2d_projections_dict)
-
-    print(image_size)
-
     # format the inputs 
     all_object_points = []
     all_image_points = []
 
-    # should be done for all images of calibration but only using one here 
-    # for image in images_list: 
+    # get the 3D points 
+    cloud_of_3d_points_dict = get_cloud_of_3d_points()
+    # save the 3D points that were found during the process 
+    found_3d_points_dict = {}
 
-    object_points = np.zeros((1, retval, 3), dtype=np.float32)
-    image_points = np.zeros((1, retval, 2), dtype=np.float32)
+    # get the images points in each images
+    for calibration_image_dir in calibration_images_directories:
+        print(f"Getting 2D coordinates of {Path(calibration_image_dir).absolute().name}")
 
-    for index, key in enumerate(cloud_of_3d_points_dict_filtered):
-        object_points[0][index] = cloud_of_3d_points_dict_filtered[key]
-        image_points[0][index] = coords_2d_projections_dict[key]
+        # match 3D points and 2D projection of these points 
+        retval, coords_2d_projections_dict, image_size = get_scatter_of_2D_points_projection(input_image_dir = calibration_image_dir)
+        cloud_of_3d_points_dict_filtered = filter_cloud_of_3d_points(cloud_of_3d_points_dict, coords_2d_projections_dict)
 
-    all_object_points.append(object_points)
-    all_image_points.append(image_points)
+        # store the found points in the found_3d_points_dict
+        common_keys = set(coords_2d_projections_dict.keys()).intersection(cloud_of_3d_points_dict.keys())
+        newly_found_key_counter = 0
+        for key in common_keys:
+            if key not in found_3d_points_dict:
+                newly_found_key_counter += 1
+                found_3d_points_dict[key] = cloud_of_3d_points_dict[key]
+
+        # print(f"Found {len(cloud_of_3d_points_dict_filtered)} corners in the image")
+        # print(f"Here is the list of ids :\n {cloud_of_3d_points_dict_filtered.keys()}")
+        print(f"{len(cloud_of_3d_points_dict_filtered.keys())} were found this time.") 
+        print(f"Of which, {newly_found_key_counter} were found for the first time.") 
+        print(f"So far, {len(found_3d_points_dict.keys())} were found")       
+        # print(f"Here is the updated found_3d_points_dict:\n {found_3d_points_dict.keys()}")
+
+
+        # format the points
+        object_points = np.zeros((retval, 3), dtype=np.float32)
+        image_points = np.zeros((retval, 2), dtype=np.float32)
+
+        for index, key in enumerate(cloud_of_3d_points_dict_filtered):
+            object_points[index] = cloud_of_3d_points_dict_filtered[key]
+            image_points[index] = coords_2d_projections_dict[key]
+
+        all_object_points.append(object_points)
+        all_image_points.append(image_points)
+
+    # print("all_object_points len \n", len(all_object_points))
+    # print("all_image_points len \n", len(all_image_points))
+    # print("all_image_points len \n", len(found_3d_points_dict.keys()))
 
     # Carry out calibration of the camera
     # initial_camera_matrix = np.array([[ 1000.,    0., image_size[0]/2.],
@@ -284,29 +314,25 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
     #                             [ 0.00000000e+00], [ 0.00000000e+00]])
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 0.001)
-
-    # Call the calibrateCamera function with the initial camera matrix flag
-    calibrate_camera_results = {}
     # cv2.CALIB_ZERO_TANGENT_DIST
     # cv2.CALIB_RATIONAL_MODEL 
     # cv2.CALIB_THIN_PRISM_MODEL
     # cv2.CALIB_TILTED_MODEL
     flags = cv2.CALIB_USE_INTRINSIC_GUESS + cv2.CALIB_RATIONAL_MODEL
-    retval, cameraMatrix, distCoeffs, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, perViewErrors = cv2.calibrateCameraExtended(objectPoints = object_points, 
-                                                                         imagePoints = image_points, 
+    retval, cameraMatrix, distCoeffs, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, perViewErrors = cv2.calibrateCameraExtended(objectPoints = all_object_points, 
+                                                                         imagePoints = all_image_points, 
                                                                          imageSize = image_size,
                                                                          cameraMatrix = initial_camera_matrix,
                                                                          distCoeffs = distCoeffsInit,
                                                                          flags=flags,
                                                                          criteria=criteria)
     
-    calibrate_camera_results.update({"retval":retval, "cameraMatrix":cameraMatrix,
-                    "distCoeffs":distCoeffs, "rvecs":rvecs, "tvecs":tvecs,
-                    "stdDeviationsIntrinsics":stdDeviationsIntrinsics,
-                    "stdDeviationsExtrinsics":stdDeviationsExtrinsics,
-                    "perViewErrors":perViewErrors})
-
-
+    print("retval", retval)
+    print("perViewErrors", perViewErrors)
+    
+    
+    
+    ## post processing
     # plotting the camera position
     rotation_matrix, _ = cv2.Rodrigues(rvecs[0])
     # invert the rotation matrix to obtain the rotation from the camera coordinate system to the world coordinate system
@@ -317,7 +343,7 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
     if flag1:
         camera_position_world_as_a_list = [item for sublist in camera_position_world for item in sublist]
         camera_position_world_formatted = np.array(camera_position_world_as_a_list)
-        cloud_of_3d_points_dict_filtered.update({'camera': camera_position_world_formatted})
+        found_3d_points_dict.update({'camera': camera_position_world_formatted})
 
         if flag2: 
             axis_length = 10
@@ -342,7 +368,7 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
 
 
         # plot
-        plot_3d_points(cloud_of_3d_points_dict_filtered, flag=True)
+        plot_3d_points(found_3d_points_dict, flag=True)
     
     if flag3:
         # TODO: a dict 
@@ -377,13 +403,11 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
         
         # p1
         mean_p1 = distCoeffs[2][0]
-        print("DDDD", mean_p1)
         std_dev_p1 = stdDeviationsIntrinsics[6]
         cov_p1_percentage = abs(std_dev_p1[0]/mean_p1*100)
         
         # p2
         mean_p2 = distCoeffs[3][0]
-        print("DDDD", mean_p2)
         std_dev_p2 = stdDeviationsIntrinsics[7]
         cov_p2_percentage = abs(std_dev_p2[0]/mean_p2*100)
         
@@ -420,26 +444,27 @@ def calibrate_camera(input_image_dir: str, flag1: bool = False, flag2: bool = Fa
 
         fig3 = plt.figure("Distorsion coefficients")
         plot_probality_density_function(mean_k1, std_dev_k1, f'{names[4]}, {round(mean_k1)}, {round(std_dev_k1[0])}, {round(cov_k1_percentage, 2)}%')
-        plt.show()
+        # plt.show()
 
         fig4 = plt.figure("Distorsion coefficients")
         plot_probality_density_function(mean_k2, std_dev_k2, f'{names[5]}, {round(mean_k2)}, {round(std_dev_k2[0])}, {round(cov_k2_percentage, 2)}%')
-        plt.show()
+        # plt.show()
 
         fig5 = plt.figure("Distorsion coefficients")
         plot_probality_density_function(mean_p1, std_dev_p1, f'{names[6]}, {round(mean_p1)}, {round(std_dev_p1[0])}, {round(cov_p1_percentage, 2)}%')
-        plt.show()
+        # plt.show()
 
         fig6 = plt.figure("Distorsion coefficients")
         plot_probality_density_function(mean_p2, std_dev_p2, f'{names[7]}, {round(mean_p2)}, {round(std_dev_p2[0])}, {round(cov_p2_percentage, 2)}%')
-        plt.show()
+        # plt.show()
 
         fig7= plt.figure("Distorsion coefficients")
         plot_probality_density_function(mean_k3, std_dev_k3, f'{names[8]}, {round(mean_k3)}, {round(std_dev_k3[0])}, {round(cov_k3_percentage, 2)}%')
         # plot_probality_density_function(mean_k4, std_dev_k4, f'{names[9]}, {round(mean_k4)}, {round(std_dev_k4[0])}, {round(cov_k4_percentage, 2)}%')
         # plot_probality_density_function(mean_k5, std_dev_k5, f'{names[10]}, {round(mean_k5)}, {round(std_dev_k5[0])}, {round(cov_k5_percentage, 2)}%')
         # plot_probality_density_function(mean_k6, std_dev_k6, f'{names[3]}, {round(mean_k6)}, {round(std_dev_cy[0])}, {round(cov_k6_percentage, 2)}%')
-        plt.show()
+        
+        # plt.show()
 
     return retval, cameraMatrix, distCoeffs, rvecs, tvecs, stdDeviationsIntrinsics, stdDeviationsExtrinsics, perViewErrors
 
@@ -480,19 +505,15 @@ def plot_probality_density_function(mean:float, std_dev:float, param:str):
 
 if __name__ == "__main__":
     coord_3D_points = get_cloud_of_3d_points()
-    directory = r"C:\Users\hilar\Documents\project\geocam\src\images\calibration_img_example.jpg"
-    retval, coords_2d_projections, image_size = get_scatter_of_2D_points_projection(input_image_dir = directory, flag2=True)
+    # directory = r"C:\Users\hilar\Documents\project\geocam\src\images\calibration_img_example.jpg"
+    directory = r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp5_calibration_images\*.jpg"
+    results = calibrate_camera(input_calibration_images_dir=directory, flag1=True, flag3=True)
 
-    coord_3D_points_filtered = filter_cloud_of_3d_points(coord_3D_points, coords_2d_projections)
+    # tesst = get_scatter_of_2D_points_projection(input_image_dir=r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp2_calibration_images\rp2_config_1_img002.jpg", flag2=True)
 
-    # print("coords_2d_projections", coords_2d_projections)
-    # print()
-    # print("coord_3D_points_filtered", coord_3D_points_filtered)
-
-    names = ["retval", "cameraMatrix", "distCoeffs", "rvecs", "tvecs", "stdDeviationsIntrinsics", "stdDeviationsExtrinsics", "perViewErrors"]
-    results = calibrate_camera(input_image_dir=directory, flag1=True, flag3=True)
     
-    for index, name in enumerate(names):
-        print(name, results[index])
 
-    # plot_probality_density_function()
+    # names = ["retval", "cameraMatrix", "distCoeffs", "rvecs", "tvecs", "stdDeviationsIntrinsics", "stdDeviationsExtrinsics", "perViewErrors"]
+    # for index, name in enumerate(names):
+    #     print(name, results[index])
+
