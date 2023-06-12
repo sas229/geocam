@@ -217,7 +217,7 @@ def get_scatter_of_2D_points_projection(input_image_dir: str,
     
     return retval, coords_2d_projections, image_size
 
-def calibrate_camera(input_images_dir:str = r"C:\Users\hilar\Documents\project\geocam\src\images\cylindrical_calibration_rig\*.jpg"):
+def calibrate_camera(input_images_dir:str = r"c:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp1_calibration_images\*.jpg"):
 
     # store the directories of each calibration image in a directory
     calibration_images_directories = glob.glob(input_images_dir)
@@ -252,8 +252,8 @@ def calibrate_camera(input_images_dir:str = r"C:\Users\hilar\Documents\project\g
         # print(all_image_points)
 
     # Carry out opencv calibration of the camera to find the camera matrix and extenric matrix 
-    initial_camera_matrix = np.array([[ 1000.,    0., image_size[0]/2.],
-                                    [    0., 1000., image_size[1]/2.],
+    initial_camera_matrix = np.array([[ 3.62916898e+03,    0., 1.58513866e+03],
+                                    [    0., 3.77369633e+03, 2.10494246e+03],
                                     [    0.,    0.,           1.]])
     distCoeffsInit = np.zeros((5,1))
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 0.001)
@@ -272,14 +272,16 @@ def calibrate_camera(input_images_dir:str = r"C:\Users\hilar\Documents\project\g
         # rotation matrix 
         rotation_matrix, _ = cv2.Rodrigues(rvecs[index])
         extrinsic_matrix = np.hstack((rotation_matrix, tvecs[index]))
+
+        print("object_points\n", object_points)
         
         # optimization process 
-        # distortion_coefficients = np.zeros(20)
-        distortion_coefficients = [1.45598487e-04, 9.90567117e-01, 9.47409801e-04, -8.00497563e-03,
-                                   -6.40577414e-03, -3.39783002e-01, -1.65442306e-02,  6.65389864e-03,
-                                    -2.18857410e-01, -4.73834414e-03, -1.04825610e-04,  4.58516917e-04,
-                                    1.00447982e+00, 4.99436767e-03,  2.44399043e-02, -2.49364963e-03,
-                                    -6.69130328e-01, -2.01844464e-03, -6.10910165e-03, -3.59383038e-01]
+        distortion_coefficients = np.zeros(20)
+        # distortion_coefficients = [1.45598487e-04, 9.90567117e-01, 9.47409801e-04, -8.00497563e-03,
+        #                            -6.40577414e-03, -3.39783002e-01, -1.65442306e-02,  6.65389864e-03,
+        #                             -2.18857410e-01, -4.73834414e-03, -1.04825610e-04,  4.58516917e-04,
+        #                             1.00447982e+00, 4.99436767e-03,  2.44399043e-02, -2.49364963e-03,
+        #                             -6.69130328e-01, -2.01844464e-03, -6.10910165e-03, -3.59383038e-01]
         optimized_distortion_coefficients = custom_calibration(object_points=object_points, 
                                   extrinsic_matrix=extrinsic_matrix, 
                                   cameraMatrix=cameraMatrix, 

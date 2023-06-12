@@ -8,11 +8,13 @@ geocam = {editable = true, path = '.'}
 getmac = "*"
 pytest = "*"
 mock = "*"
-numpy = "==1.19.5"
+numpy = "*"
 pillow = "==8.1.2"
 opencv-python = "==4.5.1.48"
 opencv-contrib-python = "==4.5.1.48"
 glob2 = "*"
+scipy = "*"
+matplotlib = "*"
 
 [dev-packages]
 build = "*"
@@ -23,7 +25,6 @@ sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
 colorama = "*"
-matplotlib = "*"
 
 [requires]
 python_version = "3.9.2"

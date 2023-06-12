@@ -25,10 +25,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
 ]
 
-dependencies = [
-    "numpy==1.23.3",
-]
-
 [project.urls]
 "Homepage" = "https://github.com/sas229/geocam"
 "Bug Tracker" = "https://github.com/sas229/geocam/issues"

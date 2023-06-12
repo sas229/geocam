@@ -8,6 +8,8 @@ from cv2 import aruco
 from pathlib import Path 
 from scipy.stats import norm
 
+print("done with imports")
+
 
 #############################################################################################################################################
 ## HANDLE 3D world coordinates ##############################################################################################################
@@ -74,7 +76,7 @@ def get_cloud_of_3d_points(charuco_num_of_columns:int = 44,
     
     return coords_3d_points
 
-def plot_3d_points(coords_3d_points: dict, flag: bool = False):
+def plot_3d_points(coords_3d_points: dict, flag: bool = False, length_arrows_mm: float = 15):
     """
     Plot the 3D points in a scatter plot.
 
@@ -103,14 +105,28 @@ def plot_3d_points(coords_3d_points: dict, flag: bool = False):
         z_coordinates = np.append(z_coordinates, coords[2])
 
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
+    ax = fig.add_subplot(111, projection='3d')
+    origin = np.zeros(3)
+
+    ax.view_init(30, 45)
+    ax.quiver(origin[0], origin[1], origin[2], 1, 0, 0, color="r", length = length_arrows_mm)
+    ax.quiver(origin[0], origin[1], origin[2], 0, 1, 0, color="g", length = length_arrows_mm)
+    ax.quiver(origin[0], origin[1], origin[2], 0, 0, 1, color="b", length = length_arrows_mm)
+
+    ax.text(length_arrows_mm * 0.1, length_arrows_mm * 0.0, -length_arrows_mm * 0.2, r'$0$')
+    ax.text( length_arrows_mm * 1.3, length_arrows_mm * 0, length_arrows_mm * 0, r'$x$')
+    ax.text(length_arrows_mm * 0, length_arrows_mm * 1.3, length_arrows_mm * 0, r'$y$')
+    ax.text(length_arrows_mm * 0, length_arrows_mm * 0, length_arrows_mm * 1.3, r'$z$')
+
     ax.scatter(x_coordinates, y_coordinates, z_coordinates, marker=".")
 
     if flag:
+
         # show the ids of the corners
         for i, corner_id in enumerate(corner_ids):
             label = int(corner_id) if isinstance(corner_id, float) else corner_id
-            ax.text(x_coordinates[i], y_coordinates[i], z_coordinates[i], str(label), fontsize=4)
+            ax.text(x_coordinates[i], y_coordinates[i], z_coordinates[i], str(label), fontsize=6)
+            
 
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -224,28 +240,11 @@ def get_scatter_of_2D_points_projection(input_image_dir: str,
     
     return retval, coords_2d_projections, image_size
 
-def stack_points(model_coord_filterd, px_coord):
-
-    model_Coord = np.ones((0,3))
-    for val in model_coord_filterd.values():
-
-        model_Coord = np.vstack((model_Coord, val))
-
-    model_coord = []
-    model_coord.append(model_Coord)
-    model_coord = np.float32(model_coord)
-
-    px_Coord = []
-    px_Coord.append(px_coord)
-
-    return model_coord, px_Coord
-
-
 def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, flag2: bool = False, flag3: bool = False):
 
     # Get the calibration images
     calibration_images_directories = glob.glob(input_calibration_images_dir)
-    print(calibration_images_directories)
+    # print(calibration_images_directories)
 
     # Sample input for objectPoints (3D points in the real world) and imagePoints (2D points captured by the camera)
     # format the inputs 
@@ -259,7 +258,8 @@ def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, fla
 
     # get the images points in each images
     for calibration_image_dir in calibration_images_directories:
-        print(f"Getting 2D coordinates of {Path(calibration_image_dir).absolute().name}")
+
+        # print(f"Getting 2D coordinates of {Path(calibration_image_dir).absolute().name}")
 
         # match 3D points and 2D projection of these points 
         retval, coords_2d_projections_dict, image_size = get_scatter_of_2D_points_projection(input_image_dir = calibration_image_dir)
@@ -275,11 +275,10 @@ def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, fla
 
         # print(f"Found {len(cloud_of_3d_points_dict_filtered)} corners in the image")
         # print(f"Here is the list of ids :\n {cloud_of_3d_points_dict_filtered.keys()}")
-        print(f"{len(cloud_of_3d_points_dict_filtered.keys())} were found this time.") 
-        print(f"Of which, {newly_found_key_counter} were found for the first time.") 
-        print(f"So far, {len(found_3d_points_dict.keys())} were found")       
+        # print(f"{len(cloud_of_3d_points_dict_filtered.keys())} were found this time.") 
+        # print(f"Of which, {newly_found_key_counter} were found for the first time.") 
+        # print(f"So far, {len(found_3d_points_dict.keys())} were found")       
         # print(f"Here is the updated found_3d_points_dict:\n {found_3d_points_dict.keys()}")
-
 
         # format the points
         object_points = np.zeros((retval, 3), dtype=np.float32)
@@ -327,23 +326,123 @@ def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, fla
                                                                          flags=flags,
                                                                          criteria=criteria)
     
-    print("retval", retval)
-    print("perViewErrors", perViewErrors)
+    # print("retval", retval)
+    # print("perViewErrors", perViewErrors)
     
-    
-    
+
     ## post processing
-    # plotting the camera position
-    rotation_matrix, _ = cv2.Rodrigues(rvecs[0])
-    # invert the rotation matrix to obtain the rotation from the camera coordinate system to the world coordinate system
-    rotation_matrix_inv = np.linalg.inv(rotation_matrix)
-    # multiply the inverted rotation matrix (rotation_matrix_inv) with the translation vector (tvec) to obtain the camera position in world coordinates
-    camera_position_world = -np.dot(rotation_matrix_inv, tvecs[0])
+    # get camera position 
+    number_of_configs = 5
+    number_of_capture_per_config = 3
+    number_of_calibration_images = number_of_configs*number_of_capture_per_config
+
+    # check that all is as expected
+    assert(number_of_calibration_images == len(calibration_images_directories))
+
+    # first "rough" results - TODO: add some colouring to make things clearer to understand
+    cameras_positions_world_per_view = np.zeros((number_of_calibration_images, 3), dtype=np.float32) 
+
+    for index, (rvec, tvec) in enumerate(zip(rvecs, tvecs)):
+        # plotting the camera position
+        rotation_matrix, _ = cv2.Rodrigues(rvec)
+        # invert the rotation matrix to obtain the rotation from the camera coordinate system to the world coordinate system
+        rotation_matrix_inv = np.linalg.inv(rotation_matrix)
+        # multiply the inverted rotation matrix (rotation_matrix_inv) with the translation vector (tvec) to obtain the camera position in world coordinates
+        camera_position_world = -np.dot(rotation_matrix_inv, tvec)
+        # format the camera_position_world
+        camera_position_world_formatted = np.reshape(camera_position_world, (3,))
+        # print(camera_position_world_formatted)
+        # update the value
+        cameras_positions_world_per_view[index] = camera_position_world_formatted
+
+    print("cameras_positions_world_per_view:\n", cameras_positions_world_per_view)
+
+    # create the dict 
+    id_cameras_positions_per_view = "rp1_config_{}_img_{}"
+    cameras_positions_world_per_view_dict = {
+        id_cameras_positions_per_view.format(config, capture): cameras_positions_world_per_view[capture + config * number_of_capture_per_config]
+        for config in range(number_of_configs)
+        for capture in range(number_of_capture_per_config)
+    }
+
+    print("cameras_positions_world_per_view_dict:\n", cameras_positions_world_per_view_dict)
+
+    # more refined process 
+    cameras_positions_world_per_config = np.zeros((number_of_configs, 3), dtype=np.float32)
+
+    # TODO: this could be enhanced by making it more robust. To maybe accept the case when the number 
+    for config in range(number_of_configs):
+        for capture in range(number_of_capture_per_config):
+            images_of_the_config = cameras_positions_world_per_view[config:config + number_of_capture_per_config]
+            cameras_positions_world_per_config[config] = np.mean(a=images_of_the_config,
+                                                                 axis=0,
+                                                                 dtype=np.float32)
+    
+    print("cameras_positions_world_per_config\n", cameras_positions_world_per_config)
+
+    # create the dict 
+    id_cameras_positions_per_config = "rp1_config_{}"
+    cameras_positions_world_per_config_dict = {
+        id_cameras_positions_per_config.format(config): cameras_positions_world_per_config[config] for config in range(number_of_configs)
+    }
+
+    print("cameras_positions_world_per_config_dict:\n", cameras_positions_world_per_config_dict)
+
+    # working on bringing all the configs - will be optionnal - default to the first conifg 
+    # TODO: add informations on rotations too  
+    config_of_reference = 0
+    list_of_translations_from_cameras_position_to_config_of_ref = np.zeros((number_of_configs, 3), dtype=np.float32)
+    for config in range(number_of_configs):
+        translation_from_cameras_position_to_config_of_ref = cameras_positions_world_per_config[config_of_reference] - cameras_positions_world_per_config[config]
+        list_of_translations_from_cameras_position_to_config_of_ref[config] = translation_from_cameras_position_to_config_of_ref
+
+    print("list_of_translations_from_cameras_position_to_config_of_ref:\n", list_of_translations_from_cameras_position_to_config_of_ref)
+
+    # create the dict 
+    id_cameras_positions_per_config = "rp1_config_{}"
+    translations = {
+        id_cameras_positions_per_config.format(config): list_of_translations_from_cameras_position_to_config_of_ref[config] for config in range(number_of_configs)
+    }
+
+    print("translations:\n", translations)
+
+    # # bring all the cameras to reference and get vitually fixed camera position 
+    updated_positions_world_per_config = cameras_positions_world_per_config + list_of_translations_from_cameras_position_to_config_of_ref
+    print("cameras_positions_world_per_config:\n", cameras_positions_world_per_config)
+    print("updated_positions_world_per_config:\n", updated_positions_world_per_config)
+   
+    camera_position = np.mean(a=updated_positions_world_per_config,
+                              axis=0,
+                              dtype=np.float32)
+    print("camera_position:\n", camera_position)
+
+    
+
+
+
+    # print(cameras_positions_world_per_view)
+
+    # more "refined" results. That take care of compute the virtually fixed position of the camera 
+    # cameras_positions_world_per_config = np.zeros((number_of_configs, 3), dtype=np.float32)
+    # 
+    
+    #         cameras_positions_world_per_config[config] = np.mean(a=cameras_positions_world_per_view[config:number_of_capture_per_config],
+    #                                                              axis=0,
+    #                                                              dtype=np.float32)
+    # print(cameras_positions_world_per_config)
+
+    # choose a virtually fixed reference for the camera position
+    
+    
+    rp1_cache_coor = np.array([-30.26706, 140.0769, 10.958224], dtype=np.float32)
+    rp4_cache_coor = np.array([-30.195871, 137.09703,   65.640526], dtype=np.float32)
 
     if flag1:
-        camera_position_world_as_a_list = [item for sublist in camera_position_world for item in sublist]
-        camera_position_world_formatted = np.array(camera_position_world_as_a_list)
-        found_3d_points_dict.update({'camera': camera_position_world_formatted})
+        
+        camera_name = "rp5_camera"
+        found_3d_points_dict.update({camera_name: camera_position})
+        found_3d_points_dict.update({"rp1_camera": rp1_cache_coor})
+        found_3d_points_dict.update({"rp4_camera": rp4_cache_coor})
 
         if flag2: 
             axis_length = 10
@@ -368,7 +467,7 @@ def calibrate_camera(input_calibration_images_dir: str, flag1: bool = False, fla
 
 
         # plot
-        plot_3d_points(found_3d_points_dict, flag=True)
+        plot_3d_points(found_3d_points_dict)
     
     if flag3:
         # TODO: a dict 
@@ -479,8 +578,6 @@ def plot_3d_points_and_camera(results_calibrate_camera: dict, flag1:bool = False
     stdDeviationsExtrinsics = results_calibrate_camera["stdDeviationsExtrinsics"] 
     perViewErrors = results_calibrate_camera["perViewErrors"]
 
-        
-
 def plot_probality_density_function(mean:float, std_dev:float, param:str):
 
     # Generate x values spanning a range around the mean
@@ -507,11 +604,9 @@ if __name__ == "__main__":
     coord_3D_points = get_cloud_of_3d_points()
     # directory = r"C:\Users\hilar\Documents\project\geocam\src\images\calibration_img_example.jpg"
     directory = r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp5_calibration_images\*.jpg"
-    results = calibrate_camera(input_calibration_images_dir=directory, flag1=True, flag3=True)
+    results = calibrate_camera(input_calibration_images_dir=directory, flag1=True)#, flag3=True)
 
     # tesst = get_scatter_of_2D_points_projection(input_image_dir=r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp2_calibration_images\rp2_config_1_img002.jpg", flag2=True)
-
-    
 
     # names = ["retval", "cameraMatrix", "distCoeffs", "rvecs", "tvecs", "stdDeviationsIntrinsics", "stdDeviationsExtrinsics", "perViewErrors"]
     # for index, name in enumerate(names):

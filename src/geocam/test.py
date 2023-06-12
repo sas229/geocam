@@ -1,51 +1,47 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from pathlib import Path
-import glob
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import numpy as np
 
+fig = plt.figure()
 
-def find_the_real_world_coor_of_the_corners(squareLength=0.005, cylinderRadius=0.07/2, boardColumns=44, boardRows=28, flag = True):
-    deltaTheta = squareLength/cylinderRadius
-    real_coord = {}
-    horizontalNumberOfcorners = boardColumns-1
-    verticalNumberOfcorners = boardRows-1
-    cornerId = 0
+ax = fig.add_subplot(111, projection='3d')
 
-    #for plots 
-    x_coordinates = []
-    y_coordinates = []
-    z_coordinates = []
+# x_poly = np.zeros((3,3))
 
-    for i in range(verticalNumberOfcorners):
-        for j in range(horizontalNumberOfcorners):
-            
-            cornerId = horizontalNumberOfcorners*i + j
-            theta = j*deltaTheta
-            x_coordinate = cylinderRadius*np.cos(theta) 
-            y_coordinate = cylinderRadius*np.sin(theta)
-            z_coordinate = cylinderRadius*4 - (i*squareLength + squareLength)
+length_arrows_mm = 40 
+color = 'skyblue'
+alpha = 0.4
+elem_length_1 = .1*length_arrows_mm
+elem_length_2 = .6*length_arrows_mm
 
-            # update dict 
-            real_coord[cornerId] = np.array([x_coordinate, y_coordinate, z_coordinate], np.float32)
+origin = np.array([1,3,4])
+x_plan_normal_to_x = [origin[0], origin[0], origin[0], origin[0]]
+y_plan_normal_to_x = [origin[1] + elem_length_1, origin[1] + elem_length_2, origin[1] + elem_length_2, origin[1] + elem_length_1]
+z_plan_normal_to_x = [origin[2] + elem_length_1, origin[2] + elem_length_1, origin[2] + elem_length_2, origin[2] + elem_length_2]
 
-            # update lists for plotting 
-            x_coordinates.append(x_coordinate)
-            y_coordinates.append(y_coordinate)
-            z_coordinates.append(z_coordinate)
+x_plan_normal_to_y = [elem_length_1, elem_length_2, elem_length_2, elem_length_1]
+y_plan_normal_to_y = [origin[1], origin[1], origin[1], origin[1]]
+z_plan_normal_to_y = [origin[2] + elem_length_1, origin[2] + elem_length_1, origin[2] + elem_length_2, origin[2] + elem_length_2]
 
-    if flag: 
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        ax.scatter(x_coordinates, y_coordinates, z_coordinates, marker=".")
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        ax.set_zlabel('Z Label')
-        plt.axis('equal')
-        plt.show()
+x_plan_normal_to_z = [elem_length_1, elem_length_2, elem_length_2, elem_length_1]
+y_plan_normal_to_z = [origin[1] + elem_length_1, origin[1] + elem_length_1, origin[1] + elem_length_2, origin[1] + elem_length_2]
+z_plan_normal_to_z = [origin[2], origin[2], origin[2], origin[2]]
 
-    return real_coord
+vertice_1 = [list(zip(x_plan_normal_to_x, y_plan_normal_to_x, z_plan_normal_to_x))]
+vertice_2 = [list(zip(x_plan_normal_to_y, y_plan_normal_to_y, z_plan_normal_to_y))]
+vertice_3 = [list(zip(x_plan_normal_to_z, y_plan_normal_to_z, z_plan_normal_to_z))]
 
+poly_1 = Poly3DCollection(vertice_1, alpha=alpha, facecolors=color)
+poly_2 = Poly3DCollection(vertice_2, alpha=alpha, facecolors=color)
+poly_3 = Poly3DCollection(vertice_3, alpha=alpha, facecolors=color)
 
-if __name__ == "__main__": 
-    find_the_real_world_coor_of_the_corners(squareLength=0.005, markerLength=0.003, cylinderRadius=0.07/2, boardColumns=44, boardRows=28)
+ax.add_collection3d(poly_1)
+ax.add_collection3d(poly_2)
+ax.add_collection3d(poly_3)
+
+ax.set_xlim(-40,40)
+ax.set_ylim(-40,40)
+ax.set_zlim(-40,40)
+
+# plt.axes('equal')
+plt.show()
