@@ -258,7 +258,9 @@ def estimate_image_quality(frame, current_time, previous_max_num_of_detected_cha
 
 if __name__ == "__main__":
 
+    logging.debug("Before starting camera")
     picam2 = Picamera2()
+    logging.debug("After starting camera")
     picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
     output = StreamingOutput()
     picam2.start_recording(JpegEncoder(), FileOutput(output))

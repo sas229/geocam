@@ -603,7 +603,7 @@ def plot_probality_density_function(mean:float, std_dev:float, param:str):
 if __name__ == "__main__":
     coord_3D_points = get_cloud_of_3d_points()
     # directory = r"C:\Users\hilar\Documents\project\geocam\src\images\calibration_img_example.jpg"
-    directory = r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp5_calibration_images\*.jpg"
+    directory = r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp4_calibration_images\*.jpg"
     results = calibrate_camera(input_calibration_images_dir=directory, flag1=True)#, flag3=True)
 
     # tesst = get_scatter_of_2D_points_projection(input_image_dir=r"C:\Users\hilar\Documents\2023_06_06_Calibration_tests\sorted_by_rpi_name\rp2_calibration_images\rp2_config_1_img002.jpg", flag2=True)

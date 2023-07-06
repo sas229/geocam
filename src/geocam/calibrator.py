@@ -117,6 +117,7 @@ class Calibrator():
                                 "custom_optimisation_perViewError":None,
                                 "custom_optimisation_per_image_dist_coeff":None    
                                 }
+        
         for calibration_image_dir in calibration_images_directories:
             # Get the image size
             if not calibration_data["overall_analysis_data"]["image_size"]:
@@ -590,7 +591,7 @@ class Calibrator():
         self._camera_calibration_opencv()
 
         # Work on the distorsion coefficients 
-        # self._enhance_distorsion_handling_and_stat_analysis_of_results()
+        self._enhance_distorsion_handling_and_stat_analysis_of_results3()
 
         # Log results
         # logger.debug(f"Calibration results:\n{self.calibration_data}")
@@ -633,6 +634,7 @@ class Calibrator():
 
             # Post-process: store the found 2D and 3D points
             self.calibration_data["image_specific_data"][img_name]["coords_2d_projections_dict"] = coords_2d_projections_dict
+            print(self.calibration_data["image_specific_data"][img_name])
             self.calibration_data["image_specific_data"][img_name]["cloud_of_3d_points_dict_filtered"] = cloud_of_3d_points_dict_filtered
             
             # Post-process: refine the sorting - in found_3d_points_dict every corner is only present once 
@@ -644,12 +646,14 @@ class Calibrator():
                     all_found_3d_points_dict[key] = cloud_of_3d_points_dict[key]
 
             # Log infos 
-            logger.debug(f"Found {len(cloud_of_3d_points_dict_filtered)} corners in the image")
-            logger.debug(f"Here is the list of ids :\n {cloud_of_3d_points_dict_filtered.keys()}")
-            logger.debug(f"{len(cloud_of_3d_points_dict_filtered.keys())} were found this time.") 
-            logger.debug(f"Of which, {newly_found_key_counter} were found for the first time.") 
-            logger.debug(f"So far, {len(all_found_3d_points_dict.keys())} were found")       
-            logger.debug(f"Here is the updated found_3d_points_dict:\n {all_found_3d_points_dict.keys()}")
+            # logger.debug(f"Found {len(cloud_of_3d_points_dict_filtered)} corners in the image")
+            # logger.debug(f"Here is the list of ids :\n {cloud_of_3d_points_dict_filtered.keys()}")
+            # logger.debug(f"{len(cloud_of_3d_points_dict_filtered.keys())} were found this time.") 
+            # logger.debug(f"Of which, {newly_found_key_counter} were found for the first time.") 
+            # logger.debug(f"So far, {len(all_found_3d_points_dict.keys())} were found")       
+            # logger.debug(f"Here is the updated found_3d_points_dict:\n {all_found_3d_points_dict.keys()}")
+
+        print(self.calibration_data["image_specific_data"], "TRXIRCKTVU")
 
         # Store all_found_3d_points_dict
         self.calibration_data["overall_analysis_data"]["all_found_3d_points_dict"] = all_found_3d_points_dict
@@ -738,129 +742,6 @@ class Calibrator():
 
         return cameraMatrix
 
-    ## TODO comment these functions and fix the format of object and image points  #############################################################
-    def _enhance_distorsion_handling_and_stat_analysis_of_results(self):
-
-        # Initiate temporary array for stat analysis 
-        num_images = self.calibration_data["overall_analysis_data"]["num_images"]
-        temp_array_dist_coeffs = np.zeros((num_images, 20), dtype=np.float32)
-        temp_array_errors = np.zeros(num_images, dtype=np.float32)
-  
-        # Optimize the estimation of the distorsion parameters  
-        for index, calibration_image_dir in enumerate(self.calibration_data["overall_analysis_data"]["calibration_images_directories"]): 
-
-            # Get image name and require data 
-            img_name = Path(calibration_image_dir).absolute().name
-            image_points = self.calibration_data["overall_analysis_data"]["all_image_points"][index]
-            object_points = self.calibration_data["overall_analysis_data"]["all_object_points"][index]
-            rvec = self.calibration_data["image_specific_data"][img_name]["opencv_result_rvec"]
-            tvec = self.calibration_data["image_specific_data"][img_name]["opencv_result_tvec"]
-            rotation_matrix, _ = cv2.Rodrigues(rvec)
-            extrinsic_matrix = np.hstack((rotation_matrix, tvec))
-
-            # Carry custom calibration 
-            DISTORTION_COEFFS = np.zeros(20)
-            OPENCV_CAMERA_MATRIX = self.calibration_data["overall_analysis_data"]["opencv_result_camera_matrix"]
-            optimized_distortion_coefficients, error = self.custom_calibration(object_points=[object_points], 
-                                                extrinsic_matrix=extrinsic_matrix, 
-                                                cameraMatrix=OPENCV_CAMERA_MATRIX, 
-                                                image_points=[image_points], 
-                                                distortion_coefficients = DISTORTION_COEFFS)
-            
-            # Store results - dist coefficiants per image 
-            self.calibration_data["image_specific_data"][img_name]["custom_optimisation_per_image_dist_coeff"] = optimized_distortion_coefficients
-            # Store results - error per image 
-            self.calibration_data["image_specific_data"][img_name]["custom_optimisation_perViewError"] = error
-            # Store results - dist coefficiants and errors for stat analysis 
-            temp_array_dist_coeffs[index,:] = optimized_distortion_coefficients
-            temp_array_errors[index] = error
-
-        # Store results - stat analysis
-        self.calibration_data["overall_analysis_data"]["custom_optimisation_glob_result_dist_coeff"] = np.mean(a=temp_array_dist_coeffs, axis=0, dtype=np.float32)
-        self.calibration_data["overall_analysis_data"]["custom_optimisation_retval"] = np.mean(a=temp_array_errors, axis=0, dtype=np.float32)
-        self.calibration_data["overall_analysis_data"]["custom_optimisation_glob_result_stdDeviations_dist_coeff"] = np.std(a=temp_array_dist_coeffs, axis=0, dtype=np.float32)
-        
-    def custom_calibration(self, object_points, 
-                        extrinsic_matrix, 
-                        cameraMatrix, 
-                        image_points, 
-                        distortion_coefficients):
-    
-        # arguments for the reprojection_error_minization function 
-        args = object_points, extrinsic_matrix, cameraMatrix, image_points
-
-        # Define options
-        options = {
-            'maxiter': 1000,            # Maximum number of iterations
-            'disp': True               # Display optimization information
-        }
-
-        # optimize calling the minimize function
-        result = minimize(fun = self.reprojection_error_minization, x0 = distortion_coefficients, args = args, method='Powell', options=options)#, constraints=constraints)
-        if result.success:
-            error = self.reprojection_error(result.x, object_points, extrinsic_matrix, cameraMatrix, image_points)
-            return result.x, error
-
-    def reprojection_error_minization(self, distortion_coefficients, *args):
-
-        object_points, extrinsic_matrix, cameraMatrix, image_points = args 
-
-        # get the image points resulting from the mapping to the scaled and skewed sensor coordinates by the affine transformation
-        computed_image_points = self.projection_on_sensor(object_points = object_points, 
-                                                    extrinsic_matrix = extrinsic_matrix, 
-                                                    cameraMatrix = cameraMatrix,
-                                                    distortion_coefficients = distortion_coefficients)
-
-        # compute the overall RMS 
-        custom_retval = np.linalg.norm(image_points - computed_image_points) / len(computed_image_points)
-
-        return custom_retval
-    
-    def reprojection_error(self, optimized_distortion_coefficients, *args):
-
-        object_points, extrinsic_matrix, cameraMatrix, image_points = args 
-
-        # get the image points resulting from the mapping to the scaled and skewed sensor coordinates by the affine transformation
-        computed_image_points = self.projection_on_sensor(object_points = object_points, 
-                                                    extrinsic_matrix = extrinsic_matrix, 
-                                                    cameraMatrix = cameraMatrix,
-                                                    distortion_coefficients = optimized_distortion_coefficients)
-
-        # compute the overall RMS 
-        error_for_each_point = image_points - computed_image_points
-        # print(error_for_each_point)
-        custom_retval = np.linalg.norm(image_points - computed_image_points) / len(computed_image_points)
-
-        return custom_retval
-
-    def projection_on_sensor(self, object_points, 
-                        extrinsic_matrix, 
-                        cameraMatrix,
-                        distortion_coefficients):
-
-        # format the object_points
-        object_points_column = np.column_stack(object_points)
-        object_points_column_hom = np.hstack((object_points_column, np.ones((object_points_column.shape[0],1))))
-
-        # transform the object_points from world system to camera system 
-        object_points_in_camera_system = np.dot(object_points_column_hom, extrinsic_matrix.T)
-
-        # transform the object_points in camera system in normalised image plane
-        object_points_in_camera_system /= object_points_in_camera_system[:,-1][:, np.newaxis]
-        projection_on_normalized_img_plane = object_points_in_camera_system[:,:-1]
-
-        # apply distortion 
-        lens_distorted_2d_coords = self.warp_function(projection_on_normalized_img_plane,
-                                                distortion_coefficients)
-
-        # format the result 
-        lens_distorted_2d_coords_hom = np.hstack((lens_distorted_2d_coords, np.ones((lens_distorted_2d_coords.shape[0],1))))
-
-        # mapping to the scaled and skewed sensor coordinates by the affine transformation
-        computed_image_points = np.dot(lens_distorted_2d_coords_hom, cameraMatrix[:-1].T)
-
-        return computed_image_points
-
     def warp_function(self, projection_on_normalized_img_plane, distortion_coefficients):
     
         x = projection_on_normalized_img_plane[:, 0]
@@ -882,8 +763,225 @@ class Calibrator():
         param = distortion_coefficients.reshape(2, 10)
         lens_distorted_2d_coords = np.dot(non_linear_vector, param.T)
 
-        return lens_distorted_2d_coords 
+        return lens_distorted_2d_coords     
 
+    def _enhance_distorsion_handling_and_stat_analysis_of_results3(self):
+
+        # Initiate temporary array for stat analysis 
+        num_images = self.calibration_data["overall_analysis_data"]["num_images"]
+  
+        # Optimize the estimation of the distorsion parameters  
+        optimized_distortion_coefficients, custom_retval = self.custom_calibration3()
+        print("optimized_distortion_coefficients\n", optimized_distortion_coefficients)
+        print("custom_retval\n", custom_retval)
+
+    
+    def custom_calibration3(self):
+        
+        # Constants
+        DISTORTION_COEFFS = np.zeros(20)
+
+        # Define options
+        options = {
+            'maxiter': 1000,            # Maximum number of iterations
+            'disp': True               # Display optimization information
+        }
+
+        # optimize calling the minimize function
+        result = minimize(fun = self.reprojection_error3, x0 = DISTORTION_COEFFS, method='Powell', options=options)
+        if result.success:
+            custom_retval = self.reprojection_error3(result.x)
+            return result.x, custom_retval
+    
+    def reprojection_error3(self, distortion_coefficients):
+
+        # get the image points resulting from the mapping to the scaled and skewed sensor coordinates by the affine transformation
+        computed_image_points, final_stacked_image_points = self.projection_on_sensor3(distortion_coefficients = distortion_coefficients)
+
+        # compute the overall RMS 
+        custom_retval = np.linalg.norm(final_stacked_image_points - computed_image_points) / len(computed_image_points)
+
+        return custom_retval
+    
+    ### Working on ##########################################################################################################################################
+    #########################################################################################################################################################
+        
+    def projection_on_sensor3(self, distortion_coefficients):
+            
+        # Constants  
+        OPENCV_CAMERA_MATRIX = self.calibration_data["overall_analysis_data"]["opencv_result_camera_matrix"]
+        num_images = self.calibration_data["overall_analysis_data"]["num_images"]
+
+        # Initiate a cache used to farmat the data 
+        ids_and_positions_in_array_cache = {} # this is tricky, it could be good to explain in detail 
+        last_free_vertical_pos = 0 # this is 
+        
+        # Iterate on the images and stack the data 
+        for img_counter, calibration_image_dir in enumerate(self.calibration_data["overall_analysis_data"]["calibration_images_directories"]):
+
+            # Parse the data
+            img_name = Path(calibration_image_dir).absolute().name
+            print(img_name)
+            image_points_dict = self.calibration_data["image_specific_data"][img_name]["coords_2d_projections_dict"]
+            print(len(image_points_dict))
+            print(image_points_dict)
+            print(self.calibration_data["image_specific_data"][img_name].items())
+            object_points_dict = self.calibration_data["image_specific_data"][img_name]["cloud_of_3d_points_dict_filtered"]
+            rvec = self.calibration_data["image_specific_data"][img_name]["opencv_result_rvec"]
+            tvec = self.calibration_data["image_specific_data"][img_name]["opencv_result_tvec"]
+            rotation_matrix, _ = cv2.Rodrigues(rvec)
+            extrinsic_matrix = np.hstack((rotation_matrix, tvec))
+
+            # Re arange data 
+            for vertical_pos_in_array, (image_point_item, object_point_item) in enumerate(zip(image_points_dict.items(), object_points_dict.items())):
+
+                # Parse the ids and coordinates 
+                image_point_id = image_point_item[0] # note that we always have image_point_id == object_point_id
+                object_point_id = object_point_item[0] # however while image_point_coord may change for the same id from an image to another, object_point_coord is constant for a given id   
+                image_point_coord = image_point_item[1]
+                object_point_coord = object_point_item[1]
+
+                # Store the data in temperoary arrays 
+                image_points_temp = image_point_coord
+                object_points_temp = object_point_coord
+
+                # Handle the first raw of the array 
+                if vertical_pos_in_array == 0:
+                    
+                    if last_free_vertical_pos == 0: # yes 
+                        image_points_array = image_points_temp
+                        object_points_array = object_points_temp
+                        ids_and_positions_in_array_cache.update({object_point_id:last_free_vertical_pos})
+                    
+                    elif object_point_id not in ids_and_positions_in_array_cache.keys(): #yes 
+                        image_points_array = np.zeros((last_free_vertical_pos, 2))
+                        object_points_array = np.zeros((last_free_vertical_pos, 3))
+                        image_points_array = np.vstack((image_points_array, image_points_temp))
+                        object_points_array = np.vstack((object_points_array, object_points_temp)) 
+                        last_free_vertical_pos += 1
+                        ids_and_positions_in_array_cache.update({object_point_id:last_free_vertical_pos})
+
+                    elif object_point_id in ids_and_positions_in_array_cache.keys(): #yes 
+                        image_points_array = np.zeros((last_free_vertical_pos+1, 2))
+                        object_points_array = np.zeros((last_free_vertical_pos+1, 3))
+                        image_points_array[0] = image_point_coord
+                        object_points_array[0] = object_point_coord
+                
+                else: 
+
+                    if object_point_id not in ids_and_positions_in_array_cache.keys(): # yes 
+                        image_points_array = np.vstack((image_points_array, image_point_coord))
+                        object_points_array = np.vstack((object_points_array, object_point_coord))
+                        last_free_vertical_pos += 1
+                        ids_and_positions_in_array_cache.update({object_point_id:last_free_vertical_pos})
+
+                    elif object_point_id in ids_and_positions_in_array_cache.keys(): # yes 
+                        image_points_array[ids_and_positions_in_array_cache[object_point_id]] = image_point_coord
+                        object_points_array[ids_and_positions_in_array_cache[object_point_id]] = object_point_coord
+
+            print(len(image_points_array))
+            print(f"image_points_array{img_counter}\n", image_points_array)
+
+            # check that all went well 
+            assert(image_points_array.shape[0] == object_points_array.shape[0])
+
+            ## Post processing that data 
+
+            # Format the data
+            object_points_hom = np.hstack((object_points_array, np.ones((object_points_array.shape[0],1))))
+            if img_counter == 0:
+                horizon_stacked_object_points_hom = object_points_hom
+                horizon_stacked_extrinsic_matrix = extrinsic_matrix
+                horizon_stacked_image_points = image_points_array
+            else: 
+                # Compare the heights of the current horizon_stacked_object_points_hom and object_points_hom (or image_points_array)
+                indicator = horizon_stacked_object_points_hom.shape[0] - object_points_hom.shape[0] 
+                # Case 1 - horizon_stacked_object_points_hom contains less points -> increase its number of rows (with zeros)
+                if indicator < 0: 
+                    np.vstack((horizon_stacked_object_points_hom, np.zeros((abs(indicator), 4))))
+                    np.vstack((horizon_stacked_image_points, np.zeros((abs(indicator), 2))))
+                # Case 2 - object_points_hom contains less points -> increase its number of rows (with zeros)
+                elif indicator > 0:
+                    np.vstack((object_points_hom, np.zeros((abs(indicator), 4))))
+                    np.vstack((image_points_array, np.zeros((abs(indicator), 2))))
+
+                # Stack the results 
+                np.hstack((horizon_stacked_object_points_hom, object_points_hom))
+                np.hstack((horizon_stacked_extrinsic_matrix, extrinsic_matrix))
+                np.hstack((horizon_stacked_image_points, image_points_array))
+
+        #     print(f"horizon_stacked_object_points_hom{img_counter}\n", horizon_stacked_object_points_hom)
+        #     print(f"horizon_stacked_image_points{img_counter}\n", horizon_stacked_image_points)
+
+        # print("horizon_stacked_object_points_hom\n", horizon_stacked_object_points_hom)
+        # print("horizon_stacked_image_points\n", horizon_stacked_image_points)
+
+        # check that all went well 
+        assert(horizon_stacked_object_points_hom.shape[0] == horizon_stacked_image_points.shape[0])
+        assert(horizon_stacked_object_points_hom.shape[1] == horizon_stacked_extrinsic_matrix.shape[1])
+
+        # Transform the object_points from world system to camera system 
+        object_points_in_camera_system = np.dot(horizon_stacked_object_points_hom, horizon_stacked_extrinsic_matrix.T)
+        
+        # Transform the object_points in camera system in normalised image plane
+        object_points_in_camera_system /= object_points_in_camera_system[:,-1][:, np.newaxis]
+        projection_on_normalized_img_plane = object_points_in_camera_system[:,:-1]
+
+        # Apply distortion 
+        lens_distorted_2d_coords = self.warp_function(projection_on_normalized_img_plane,
+                                                distortion_coefficients)
+
+        # Format the result 
+        lens_distorted_2d_coords_hom = np.hstack((lens_distorted_2d_coords, np.ones((lens_distorted_2d_coords.shape[0],1))))
+
+        # Mapping to the scaled and skewed sensor coordinates by the affine transformation
+        computed_image_points = np.dot(lens_distorted_2d_coords_hom, OPENCV_CAMERA_MATRIX[:-1].T)
+
+        print("horizon_stacked_image_points.shape\n", horizon_stacked_image_points.shape)
+
+        # Compute the mean value of the image positions of the coordinates in the images 
+        m = horizon_stacked_image_points.shape[0]  # Number of rows
+        N = num_images  # Number of submatrices
+
+        # Reshape the big_matrix into a 3-dimensional array of shape (m, N, 2)
+        reshaped_matrix = np.reshape(horizon_stacked_image_points, (m, N, 2))
+
+        # Calculate the average along the second axis, resulting in an array of shape (m, 2)
+        averaged_matrix = np.mean(reshaped_matrix, axis=1)
+
+        # Reshape the averaged_matrix back to shape (m, 2)
+        final_stacked_image_points = np.reshape(averaged_matrix, (m, 2))
+
+        print("final_stacked_image_points\n", final_stacked_image_points)
+
+        # check that all went well 
+        assert(horizon_stacked_object_points_hom.shape[0] == final_stacked_image_points.shape[0])
+
+        return computed_image_points, final_stacked_image_points
+
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     ## TODO write these functions ################################################################################################
     def locate_camera_in_world_coordinates(self, num_calibration_rig_configs:int = 5, num_calibration_image_per_config:int = 3):
         pass
