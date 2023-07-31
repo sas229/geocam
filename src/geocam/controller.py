@@ -29,6 +29,7 @@ class Controller:
         self.cameras_found = 0
         self.camera_ip = []
         for ip_addr in scan.list_of_hosts_found:
+            log.info("Checking IP address: {ip_addr}".format(ip_addr=ip_addr))
             found, name = self._check_hostname(ip_addr, id)
             if found:
                 log.info("RPi camera found called {name} found at {ip_addr}".format(name=name, ip_addr=ip_addr))
@@ -49,7 +50,7 @@ class Controller:
     def _check_hostname(self, ip_addr: str, id: str) -> bool:
         # Try to connect to the device via SSH. If successful, get the hostname.
         try:
-            result = fabric.Connection(host=ip_addr, connect_kwargs={"password": self.password}).run('hostname -s', hide=True)
+            result = fabric.Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password}).run('hostname -s', hide=True)
             hostname = result.stdout
             if id in hostname:
                 return True, hostname
