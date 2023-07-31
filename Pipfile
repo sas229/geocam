@@ -4,7 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-geocam = {editable = true, path = '.'}
+networkscan = "1.0.9"
+numpy = "1.23.3"
+fabric = "3.1.0"
+getpass4 = "*"
 
 [dev-packages]
 build = "*"
@@ -14,6 +17,7 @@ sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
+geocam = {editable = true, path = "."}
 
 [requires]
 python_version = "3.10"
