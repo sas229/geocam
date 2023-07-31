@@ -5,11 +5,6 @@ name = "pypi"
 
 [packages]
 geocam = {editable = true, path = '.'}
-getmac = "*"
-pytest = "*"
-mock = "*"
-pyshine = "==0.0.9"
-numpy = "*"
 
 [dev-packages]
 build = "*"
@@ -19,8 +14,6 @@ sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
-colorama = "*"
-pillow = "*"
 
 [requires]
 python_version = "3.10"
