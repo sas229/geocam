@@ -25,7 +25,8 @@ classifiers = [
 dependencies = [
     "numpy==1.23.3",
     "networkscan==1.0.9",
-    "fabric==3.1.0"
+    "fabric==3.1.0",
+    "getpass4==0.0.14.1"
 ]
 
 [project.urls]
