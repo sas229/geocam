@@ -8,6 +8,7 @@ networkscan = "1.0.9"
 numpy = "1.23.3"
 fabric = "3.1.0"
 getpass4 = "0.0.14.1"
+getmac = "*"
 
 [dev-packages]
 build = "*"
@@ -20,4 +21,4 @@ sphinx-rtd-theme = "*"
 geocam = {editable = true, path = "."}
 
 [requires]
-python_version = "3.10"
+python_version = "3"

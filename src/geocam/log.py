@@ -100,7 +100,7 @@ def initialise(level):
     format_INFO = "%(message)s"
 
     # Basic configuration.
-    logging.getLogger(__name__)
+    logging.getLogger("geocam")
 
     # Output full log.
     fh = logging.FileHandler(log_file)
