@@ -67,6 +67,10 @@ class Controller:
         self.threads_running.set()
         self.message_buffer = Queue()
 
+        # If a configuration file is provided, check the cameras are ready.
+        if configuration is not None:
+            self._check_status()
+
     def __del__(self):
         log.debug("Stopping camera threads.")
         self._close_TCP_connections()
@@ -108,7 +112,7 @@ class Controller:
                 ip = future.result()[2]
                 if found:
                     mac = getmac.get_mac_address(ip=ip)
-                    self.cameras.update({hostname: {"ip": ip, "mac": mac}})
+                    self.cameras.update({hostname: {"ip": ip, "mac": mac, "ready": False, "tcp": False}})
                     log.info("RPi camera called {name} found at {ip} with MAC address: {mac}".format(name=hostname, ip=ip, mac=mac))
     
         # If cameras are found, check control script and packages using ThreadPool.
@@ -123,43 +127,15 @@ class Controller:
                     ready = future.result()[0]
                     ip = future.result()[1]
                     if ready:
-                        status = {"ready": True}
+                        ready = True
                         log.info("Camera ready for acquisiton at {ip}".format(ip=ip))
                     else:
-                        status = {"ready": False}
+                        ready = False
                         log.warning("Camera not ready for acquisition at {ip}".format(ip=ip))
-                    self.cameras[camera].update(status)
+                    self.cameras[camera]["ready"] = ready
 
-            # Open TCP connection for each camera in a separate thread.
-            log.debug("Opening TCP connection to cameras.")
-            self.threads_running.set()
-            for camera in self.cameras:
-                thread = threading.Thread(target=self._open_TCP_connection, args=(self.threads_running, self.cameras[camera],))
-                thread.setDaemon(True)
-                thread.start()
-                self.threads.append(thread)
-                tcp = {"tcp": False}
-                self.cameras[camera].update(tcp)
-
-            # Send command via UDP to get MAC address of found devices and await response on TCP.
-            log.debug("Sending UDP command to get MAC addresses.")
-            cmd = {"command": "get_hostname_ip_mac"}
-            self.tcp_connections = 0
-            timeout = 30.0
-            start_time = time.time()
-            elapsed_time = 0.0
-            while elapsed_time < timeout and self.tcp_connections < len(self.cameras):
-                elapsed_time = time.time() - start_time
-                self._send_command(cmd)
-                time.sleep(1)
-                while not self.message_buffer.empty():
-                    message = self.message_buffer.get()
-                    hostname = message["response"]["hostname"]
-                    if self.cameras[hostname]["tcp"] == False:
-                        self.cameras[hostname]["tcp"] = True
-                        self.tcp_connections += 1
-                        log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[camera]["ip"]))
-            self._close_TCP_connections()
+            #Check status of cameras communications.
+            self._check_status()
             return self.cameras
         else:
             log.warning("No RPi cameras found on the network.")
@@ -186,6 +162,37 @@ class Controller:
             log.info("Restarted camera at {ip}".format(ip=ip))
         time.sleep(1)
 
+    def _check_status(self):
+        # Open TCP connection for each camera in a separate thread.
+        log.debug("Opening TCP connection to cameras.")
+        self.threads_running.set()
+        for camera in self.cameras:
+            self.cameras[camera]["tcp"] = False
+            thread = threading.Thread(target=self._open_TCP_connection, args=(self.threads_running, self.cameras[camera],))
+            thread.setDaemon(True)
+            thread.start()
+            self.threads.append(thread)
+
+        # Send command via UDP to get MAC address of found devices and await response on TCP.
+        log.debug("Sending UDP command to get MAC addresses.")
+        cmd = {"command": "get_hostname_ip_mac"}
+        self.tcp_connections = 0
+        timeout = 30.0
+        start_time = time.time()
+        elapsed_time = 0.0
+        while elapsed_time < timeout and self.tcp_connections < len(self.cameras):
+            elapsed_time = time.time() - start_time
+            self._send_command(cmd)
+            time.sleep(1)
+            while not self.message_buffer.empty():
+                message = self.message_buffer.get()
+                hostname = message["response"]["hostname"]
+                if self.cameras[hostname]["tcp"] == False:
+                    self.cameras[hostname]["tcp"] = True
+                    self.tcp_connections += 1
+                    log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[camera]["ip"]))
+        self._close_TCP_connections()
+
     def _open_TCP_connection(self, thread_running, camera: dict) -> None:
         # Open TCP client connection to camera.
         ip = camera["ip"]
@@ -193,13 +200,15 @@ class Controller:
         TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         connected = False
         log.info("Trying to connect to camera at {ip}".format(ip=ip))
-        while not connected:
+        start_time = time.time()
+        elapsed_time = 0.0
+        timeout = 20.0
+        while elapsed_time < timeout and not connected:
             try:
                 TCP_socket.connect((ip, TCP_PORT))
                 log.info("Connected to camera via TCP on {ip}:{port}".format(ip=ip, port = TCP_PORT))
                 connected = True
             except Exception:
-                log.info("Failed to open TCP connection to {ip}".format(ip=ip))
                 time.sleep(5)
 
             if connected:
@@ -209,15 +218,18 @@ class Controller:
                 message = data.decode('utf-8')
                 if message == "":
                     connected = False
-                    log.info("TCP connection closed by {ip}".format(ip=ip))
+                    log.warning("TCP connection closed by camera at {ip}".format(ip=ip))
                 else:
                     try:
                         message = json.loads(message)
                         if "response" in message:
                             self.message_buffer.put(message)
-                    except Exception as e:
-                        log.error(e.with_traceback())
-                        sys.exit(1)
+                            connected = False
+                    except Exception:
+                        pass
+            elapsed_time = time.time() - start_time
+        TCP_socket.close()
+        log.warning("Failed to open TCP connection to camera at {ip}".format(ip=ip))
 
     def _close_TCP_connections(self) -> None:
         # Close TCP connections to cameras.
@@ -319,13 +331,14 @@ class Controller:
         except Exception as e:
             log.warning("Exception: {e}".format(e=e))
             log.warning("Failed to kill existing camera.py processes on {ip_addr}".format(ip_addr=ip_addr))
+            log.warning(e)
         
-        # Run the launch script.
+        # Run the launch script (ignoring any exceptions raised by Fabric).
         try:
-            c.run('python3 /home/{username}/launch.py &'.format(username=self.username), hide=True, timeout=1, warn=True)
+            c.run('python3 /home/{username}/launch.py &'.format(username=self.username), hide=True, timeout=2, warn=True)
             log.info("Launch script run on {ip_addr}".format(ip_addr=ip_addr))
         except Exception:
-            log.warning("Failed to run launch script on {ip_addr}".format(ip_addr=ip_addr))
+            pass
         c.close()
 
     def _check_python_packages(self, ip_addr: str):
