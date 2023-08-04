@@ -69,7 +69,10 @@ class Controller:
 
         # If a configuration file is provided, check the cameras are ready.
         if configuration is not None:
-            self._check_status()
+            found_all_cameras = self._check_status()
+            # If any camera is not found, perform a network scan to update the configuration.
+            if not found_all_cameras:
+                self.find_cameras(id=self.id, password=self.password)
 
     def __del__(self):
         log.debug("Stopping camera threads.")
@@ -162,9 +165,10 @@ class Controller:
             log.info("Restarted camera at {ip}".format(ip=ip))
         time.sleep(1)
 
-    def _check_status(self):
+    def _check_status(self) -> bool:
         # Open TCP connection for each camera in a separate thread.
-        log.debug("Opening TCP connection to cameras.")
+        found_all_cameras = False
+        log.info("Opening TCP connection to cameras.")
         self.threads_running.set()
         for camera in self.cameras:
             self.cameras[camera]["tcp"] = False
@@ -190,8 +194,17 @@ class Controller:
                 if self.cameras[hostname]["tcp"] == False:
                     self.cameras[hostname]["tcp"] = True
                     self.tcp_connections += 1
-                    log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[camera]["ip"]))
+                    log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[hostname]["ip"])) 
         self._close_TCP_connections()
+
+        # Check all cameras have been found.
+        found_all_cameras = True
+        for camera in self.cameras:
+            if self.cameras[camera]["tcp"] == False:
+                found_all_cameras = False
+                break
+        
+        return found_all_cameras
 
     def _open_TCP_connection(self, thread_running, camera: dict) -> None:
         # Open TCP client connection to camera.
@@ -435,7 +448,7 @@ class Controller:
         try:
             log.debug("Installing Python package {package} on {ip_addr}".format(package=package, ip_addr=ip_addr))
             c.sudo('python3 pip.pyz install {wheel}'.format(wheel=wheel_name), hide=True)
-            c.sudo('rm {wheel}}'.format(wheel=wheel_name), hide=True)
+            c.sudo('rm {wheel}'.format(wheel=wheel_name), hide=True)
             log.info("Python package {package} installed on {ip_addr}".format(package=package, ip_addr=ip_addr))
         except Exception:
             log.error("Failed to install Python package {package} on {ip_addr}".format(package=package, ip_addr=ip_addr))
