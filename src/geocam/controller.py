@@ -81,7 +81,8 @@ class Controller:
         
     def find_cameras(self, id: str, network: str=None, password: str=None) -> dict:
         # SSH credentials.
-        self.username = id
+        self.id = id
+        self.username = self.id
         self.password = password
         if  self.password == None:
             self._set_ssh_credentials()
@@ -171,7 +172,7 @@ class Controller:
         log.info("Opening TCP connection to cameras.")
         self.threads_running.set()
         for camera in self.cameras:
-            self.cameras[camera]["tcp"] = False
+            self.cameras[camera]["tcp"] = False     # Set the TCP flag to False so that we check the TCP connection.
             thread = threading.Thread(target=self._open_TCP_connection, args=(self.threads_running, self.cameras[camera],))
             thread.setDaemon(True)
             thread.start()
@@ -192,9 +193,11 @@ class Controller:
                 message = self.message_buffer.get()
                 hostname = message["response"]["hostname"]
                 if self.cameras[hostname]["tcp"] == False:
-                    self.cameras[hostname]["tcp"] = True
+                    ip_addr = self.cameras[hostname]["ip"]
+                    self.cameras[hostname]["tcp"] = True    # TCP connection working so set flag True.
+                    self.cameras[hostname]["ready"] = self._check_camera_hardware(ip_addr) # Check camera.
                     self.tcp_connections += 1
-                    log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[hostname]["ip"])) 
+                    log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=ip_addr)) 
         self._close_TCP_connections()
 
         # Check all cameras have been found.
@@ -353,6 +356,16 @@ class Controller:
         except Exception:
             pass
         c.close()
+
+    def _check_camera_hardware(self, ip_addr: str) -> bool:
+        c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+        try:
+            c.run('libcamera-hello', hide=True)
+            log.info("Camera hardware detected on {ip_addr}".format(ip_addr=ip_addr))
+            return True
+        except Exception:
+            log.warning("No camera hardware detected on {ip_addr}".format(ip_addr=ip_addr))
+            return False
 
     def _check_python_packages(self, ip_addr: str):
         # Get list of installed Python packages.
