@@ -1,18 +1,20 @@
 import concurrent.futures
 from fabric import Connection
 import geocam as gc
+import geocam.dependencies as deps
 import getmac
 from getpass4 import getpass
-from glob import glob
 from importlib import resources as impresources
 import ipaddress
 import json
 import logging
 import networkscan
-import os
-import requests
-import shutil
 import socket
+import threading
+import time
+from queue import Queue
+import sys
+import os
 
 # Initialise log at default settings.
 level = logging.INFO
@@ -27,31 +29,59 @@ TCP_PORT = 1645
 
 class Controller:
 
-    required_packages = [
-        'getmac',
-        'picamera2',
-    ]
-
-    def __init__(self):
+    def __init__(self, configuration: str=None):
         log.debug("Created a Controller instance.")
-        self._set_ssh_credentials()
-        self.cameras = []
         self.ip = self._get_ip()
+        self.cameras = {}
+        if configuration is not None:
+            c = open(configuration, 'r')
+            self.cameras = json.load(c)
+            self.id = configuration.rsplit( ".", 1 )[ 0 ]
+            self.username = self.id
+            self._set_ssh_credentials()
 
-        # Camera control script.
+        # Dependencies.
         self.camera_control_script = (impresources.files(gc) / 'camera.py')
+        self.launch_script = (impresources.files(gc) / 'launch.py')
+        self.lib2to3_name = 'python3-lib2to3_3.9.2-1_all.deb'
+        self.lib2to3_file = (impresources.files(deps) / 'python3-lib2to3_3.9.2-1_all.deb')
+        self.distutils_name = 'python3-distutils_3.9.2-1_all.deb'
+        self.distutils_file = (impresources.files(deps) / 'python3-distutils_3.9.2-1_all.deb')
+        self.pip_pyz = (impresources.files(deps) / 'pip.pyz')
+        self.getmac_wheel_name = 'getmac-0.9.4-py2.py3-none-any.whl'
+        self.getmac_wheel = (impresources.files(deps) / 'getmac-0.9.4-py2.py3-none-any.whl')
 
-        # Create UDP multicast socket.
+        # Required packages.
+        self.required_packages = [
+            'getmac',
+            'picamera2',
+        ]
+        
+        # Create UDP multicast socket for sending messages.
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
 
-        # Create TCP socket.
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.tcp_socket.bind((self.ip, TCP_PORT))
-        self.tcp_socket.listen()
+        # Camera control thread storage.
+        self.threads = []
+        self.threads_running = threading.Event()
+        self.threads_running.set()
+        self.message_buffer = Queue()
 
-    def find_cameras(self, id: str, network: str=None) -> None:
+    def __del__(self):
+        log.debug("Stopping camera threads.")
+        self._close_TCP_connections()
+        log.debug("Deleted a Controller instance.")
+        
+    def find_cameras(self, id: str, network: str=None, password: str=None) -> dict:
+        # SSH credentials.
+        self.username = id
+        self.password = password
+        if  self.password == None:
+            self._set_ssh_credentials()
+
+        # Close any open TCP connections.
+        self._close_TCP_connections()
+
         # Scan network for valid IP addresses with devices.
         if network == None:
             mask = '255.255.255.0'
@@ -63,8 +93,11 @@ class Controller:
         scan.run()
 
         # Check hostname of devices using ThreadPool.
-        self.cameras = []
+        self.cameras = {}
         results = []
+        hostname = ""
+        ip = ""
+        mac = ""
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for ip_addr in scan.list_of_hosts_found:
                 log.debug("Checking IP address: {ip_addr}".format(ip_addr=ip_addr))
@@ -75,7 +108,7 @@ class Controller:
                 ip = future.result()[2]
                 if found:
                     mac = getmac.get_mac_address(ip=ip)
-                    self.cameras.append({"hostname":hostname, "ip":ip, "mac":mac})
+                    self.cameras.update({hostname: {"ip": ip, "mac": mac}})
                     log.info("RPi camera called {name} found at {ip} with MAC address: {mac}".format(name=hostname, ip=ip, mac=mac))
     
         # If cameras are found, check control script and packages using ThreadPool.
@@ -84,7 +117,7 @@ class Controller:
             results = []
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 for camera in self.cameras:
-                    ip_addr = camera["ip"]
+                    ip_addr = self.cameras[camera]["ip"]
                     results.append(executor.submit(self._check_RPi, ip_addr))
                 for future in concurrent.futures.as_completed(results):
                     ready = future.result()[0]
@@ -95,19 +128,100 @@ class Controller:
                     else:
                         status = {"ready": False}
                         log.warning("Camera not ready for acquisition at {ip}".format(ip=ip))
-                    camera.update(status)
-            # Remove locally downloaded dependencies if necessary.
-            if os.path.exists("./dependencies/"):
-                shutil.rmtree("./dependencies/")
-        
+                    self.cameras[camera].update(status)
+
+            # Open TCP connection for each camera in a separate thread.
+            log.debug("Opening TCP connection to cameras.")
+            self.threads_running.set()
+            for camera in self.cameras:
+                thread = threading.Thread(target=self._open_TCP_connection, args=(self.threads_running, self.cameras[camera],))
+                thread.setDaemon(True)
+                thread.start()
+                self.threads.append(thread)
+                tcp = {"tcp": False}
+                self.cameras[camera].update(tcp)
+
             # Send command via UDP to get MAC address of found devices and await response on TCP.
             log.debug("Sending UDP command to get MAC addresses.")
             cmd = {"command": "get_hostname_ip_mac"}
-            self._send_command(cmd)
-            self._await_TCP_responses_with_timeout(30)
-        
+            self.tcp_connections = 0
+            timeout = 30.0
+            start_time = time.time()
+            elapsed_time = 0.0
+            while elapsed_time < timeout and self.tcp_connections < len(self.cameras):
+                elapsed_time = time.time() - start_time
+                self._send_command(cmd)
+                time.sleep(1)
+                while not self.message_buffer.empty():
+                    message = self.message_buffer.get()
+                    hostname = message["response"]["hostname"]
+                    if self.cameras[hostname]["tcp"] == False:
+                        self.cameras[hostname]["tcp"] = True
+                        self.tcp_connections += 1
+                        log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=self.cameras[camera]["ip"]))
+            self._close_TCP_connections()
+            return self.cameras
         else:
             log.warning("No RPi cameras found on the network.")
+            return self.cameras
+
+    def save_configuration(self) -> None:
+        filename = self.id + ".json"
+        if len(self.cameras) == 0:
+            log.warning("No cameras found. No configuration to save...")
+            return
+        log.debug("Saving configuration to {filename}".format(filename=filename))
+        with open(filename, 'w') as outfile:
+            json.dump(self.cameras, outfile, indent=4, sort_keys=True)
+        log.info("Saved configuration to {filename}".format(filename=filename))
+
+    def restart_cameras(self):
+        log.info("Restarting all cameras...")
+        if len(self.cameras) == 0:
+            log.warning("No cameras found. Run find_cameras() or pass in a configuration...")
+            return
+        for camera in self.cameras:
+            ip = self.cameras[camera]["ip"]
+            self._run_launch_script(ip)
+            log.info("Restarted camera at {ip}".format(ip=ip))
+        time.sleep(1)
+
+    def _open_TCP_connection(self, thread_running, camera: dict) -> None:
+        # Open TCP client connection to camera.
+        ip = camera["ip"]
+        log.debug("Opening TCP connection to camera at {ip}".format(ip=ip))
+        TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connected = False
+        log.info("Trying to connect to camera at {ip}".format(ip=ip))
+        while not connected:
+            try:
+                TCP_socket.connect((ip, TCP_PORT))
+                log.info("Connected to camera via TCP on {ip}:{port}".format(ip=ip, port = TCP_PORT))
+                connected = True
+            except Exception:
+                log.info("Failed to open TCP connection to {ip}".format(ip=ip))
+                time.sleep(5)
+
+            if connected:
+                log.info("Waiting for response via TCP from camera at {ip}".format(ip=ip))
+            while connected and thread_running.is_set():
+                data = TCP_socket.recv(1024)
+                message = data.decode('utf-8')
+                if message == "":
+                    connected = False
+                    log.info("TCP connection closed by {ip}".format(ip=ip))
+                else:
+                    try:
+                        message = json.loads(message)
+                        if "response" in message:
+                            self.message_buffer.put(message)
+                    except Exception as e:
+                        log.error(e.with_traceback())
+                        sys.exit(1)
+
+    def _close_TCP_connections(self) -> None:
+        # Close TCP connections to cameras.
+        self.threads_running.clear()
 
     def _send_command(self, command: str) -> None:
         try: 
@@ -116,33 +230,20 @@ class Controller:
             log.debug("Sent command: {command}".format(command=command))
         except Exception as e: 
             log.error(e.with_traceback())
-        
-    def _await_TCP_responses_with_timeout(self, timeout: int) -> None:
-        # Wait for TCP responses from RPi cameras.
-        log.debug("Waiting for TCP responses with {timeout} second timeout.".format(timeout=timeout))
-        self.tcp_socket.settimeout(timeout)
-        try:
-            client_socket, client_address = self.tcp_socket.accept()
-            log.debug("Received TCP response from {client_address}".format(client_address=client_address))
-            data = client_socket.recv(1024)
-            message = data.decode('utf-8')
-            response = json.loads(message)
-            print("Hostname: {hostname}; IP: {ip}; MAC: {mac}".format(hostname=response['hostname'], ip=response['ip'], mac=response['mac']))
-        except socket.timeout:
-            log.debug("TCP socket timed out.")
 
     def _check_RPi(self, ip_addr: str) -> bool | str:
         installed = self._check_camera_control_script(ip_addr)
         if not installed:
             # Raspberry Pi hasn't been used as a camera before.
-            log.warning("Preparing RPi on {ip_addr}".format(ip_addr=ip_addr))
+            log.warning("Checking RPi OS on {ip_addr}".format(ip_addr=ip_addr))
             self._check_python_packages(ip_addr)
             self._install_control_script(ip_addr)
+            self._install_launch_script(ip_addr)
+            self._run_launch_script(ip_addr)
         return True, ip_addr
 
     def _set_ssh_credentials(self):
-        print("Input SSH credentials to use to connect to RPi cameras:")
-        self.username = input('Username: ')
+        print("Input SSH password to use to connect to RPi cameras:")
         self.password = getpass('Password: ')
         
     def _check_hostname(self, ip_addr: str, id: str) -> bool | str | str:
@@ -159,13 +260,13 @@ class Controller:
         except Exception:
             c.close()
             return False, "none", "none"
-        
 
     def _check_camera_control_script(self, ip_addr: str) -> bool:
         # Check if the camera control script is installed.
         file_exists_cmd = "test -f /home/{username}/camera.py && echo 'exists' || echo 'does not exist'".format(username=self.username)
         with open(self.camera_control_script, 'r') as f:
             camera_control_script_contents = f.read()
+        current_camera_control_script_contents = ""
         c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
         try:
             result = c.run(file_exists_cmd, hide=True)
@@ -180,24 +281,56 @@ class Controller:
             return True
         else:
             return False
-       
             
     def _install_control_script(self, ip_addr: str):
         # Install the control script on the RPi.
-        
         destination = '/home/{username}/camera.py'.format(username=self.username)
         log.debug("Installing control script on {ip_addr}".format(ip_addr=ip_addr))
+        c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
         try:
-            c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
             c.put(self.camera_control_script, destination)
             log.info("Control script installed on {ip_addr}".format(ip_addr=ip_addr))
         except Exception:
             log.warning("Failed to install control script on {ip_addr}".format(ip_addr=ip_addr))
         c.close()
         self._add_camera_control_script_to_crontab(ip_addr)
+    
+    def _install_launch_script(self, ip_addr: str):
+        # Install the launch script on the RPi.
+        destination = '/home/{username}/launch.py'.format(username=self.username)
+        log.debug("Installing launch script on {ip_addr}".format(ip_addr=ip_addr))
+        c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+        try:
+            c.put(self.launch_script, destination)
+            log.info("Launch script installed on {ip_addr}".format(ip_addr=ip_addr))
+        except Exception:
+            log.warning("Failed to install launch script on {ip_addr}".format(ip_addr=ip_addr))
+        c.close()
+
+    def _run_launch_script(self, ip_addr: str):
+        # Run the launch script on the RPi.
+        log.debug("Running launch script on {ip_addr}".format(ip_addr=ip_addr))
+        c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+        
+        # Kill any existing camera.py processes.
+        try:
+            c.run('pkill -f camera.py -9', hide=True, warn=True)
+            log.debug("Killed existing camera.py processes on {ip_addr}".format(ip_addr=ip_addr))
+        except Exception as e:
+            log.warning("Exception: {e}".format(e=e))
+            log.warning("Failed to kill existing camera.py processes on {ip_addr}".format(ip_addr=ip_addr))
+        
+        # Run the launch script.
+        try:
+            c.run('python3 /home/{username}/launch.py &'.format(username=self.username), hide=True, timeout=1, warn=True)
+            log.info("Launch script run on {ip_addr}".format(ip_addr=ip_addr))
+        except Exception:
+            log.warning("Failed to run launch script on {ip_addr}".format(ip_addr=ip_addr))
+        c.close()
 
     def _check_python_packages(self, ip_addr: str):
         # Get list of installed Python packages.
+        log.info("Checking Python packages on {ip_addr}".format(ip_addr=ip_addr))
         pip_list = self._get_python_package_list(ip_addr)
         for package in self.required_packages:
             if package not in pip_list:
@@ -214,83 +347,114 @@ class Controller:
         try: 
             result = c.run(pip_exists_cmd, hide=True)
             if "exists" not in result.stdout:
+                self._install_python_dependencies(ip_addr)
                 self._install_python_package_manager(ip_addr)
         except Exception:
-            log.warning("Failed to check if pip.pyz installed on {ip_addr}".format(ip_addr=ip_addr))
-                        
+            log.error("Failed to check if pip.pyz installed on {ip_addr}".format(ip_addr=ip_addr))
+            sys.exit(1)
+
         pip_list = ""
         try:
             result = c.run('python3 pip.pyz list', hide=True)
             c.close()
             pip_list = result.stdout
-            return result.stdout
-        except Exception:
-            log.fatal("Could not get list of installed packages.")
             return pip_list
+        except Exception:
+            log.error("Could not get list of installed packages.")
+            sys.exit(1)
+
+    def _install_python_dependencies(self, ip_addr: str)  -> bool:
+        c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+        # Upload package to RPi.
+        try:
+            c.put(self.lib2to3_file, '/home/{username}/{lib2to3}'.format(username=self.username, lib2to3=self.lib2to3_name))
+            c.put(self.distutils_file, '/home/{username}/{distutils}'.format(username=self.username, distutils=self.distutils_name))
+            log.info("Uploaded Python dependencies to {ip_addr}".format(ip_addr=ip_addr))
+        except Exception:
+            log.error("Failed to upload Python dependencies to {ip_addr}".format(ip_addr=ip_addr))
+            sys.exit(1)
+
+        # Install package on RPi.
+        try:
+            log.debug("Installing Python dependencies on {ip_addr}".format(ip_addr=ip_addr))
+            c.sudo('dpkg -i {lib2to3}'.format(lib2to3=self.lib2to3_name), hide=True)
+            c.sudo('dpkg -i {distutils}'.format(distutils=self.distutils_name), hide=True)
+            c.sudo('rm *.deb', hide=True)
+            log.info("Python dependencies installed on {ip_addr}".format(ip_addr=ip_addr))
+            
+        except Exception:
+            log.error("Failed to install Python dependencies on {ip_addr}".format(ip_addr=ip_addr))
+            sys.exit(1)
+
+        # Close connection and remove downloaded package.
+        c.close()
+        return True
 
     def _install_python_package_manager(self, ip_addr: str)  -> bool:
         c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
         log.info("Installing Python package manager on {ip_addr}".format(ip_addr=ip_addr))
-        pip_url = "https://bootstrap.pypa.io/pip/pip.pyz"
-        pip_app = requests.get(pip_url)
-        open('pip.pyz', 'wb').write(pip_app.content)
         success = False
         try:
-            c.put('pip.pyz', '/home/{username}/pip.pyz'.format(username=self.username))
+            c.put(self.pip_pyz, '/home/{username}/pip.pyz'.format(username=self.username))
             success = True
             log.info("Installed pip.pyz on {ip_addr}".format(ip_addr=ip_addr))
-            return True
         except Exception:
-            log.warning("Failed to upload pip.pyz to {ip_addr}".format(ip_addr=ip_addr))
-        os.remove('pip.pyz')
+            log.error("Failed to upload pip.pyz to {ip_addr}".format(ip_addr=ip_addr))
+            sys.exit(1)
         return success
         
     def _install_python_package(self, ip_addr: str, package: str) -> bool:
-        # Download package from PyPI.
-        if not os.path.exists("dependencies"): 
-            os.mkdir("dependencies")
-        os.system('pip download {package} -d dependencies'.format(package=package))
-        os.chdir("dependencies")
-        wheel = glob('{package}-*.whl'.format(package=package))[0]
+        # Select package.
+        if package == "getmac":
+            wheel = self.getmac_wheel
+            wheel_name = self.getmac_wheel_name
 
         c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
         # Upload package to RPi.
         try:
-            c.put(wheel, '/home/{username}/{wheel}'.format(username=self.username, wheel=wheel))
+            c.put(wheel, '/home/{username}/{wheel}'.format(username=self.username, wheel=wheel_name))
             log.info("Uploaded {package} to {ip_addr}".format(package=package, ip_addr=ip_addr))
         except Exception:
-            log.warning("Failed to upload {package} to {ip_addr}".format(package=package, ip_addr=ip_addr))
+            log.error("Failed to upload {package} to {ip_addr}".format(package=package, ip_addr=ip_addr))
+            sys.exit(1)
 
         # Install package on RPi.
         try:
             log.debug("Installing Python package {package} on {ip_addr}".format(package=package, ip_addr=ip_addr))
-            c.sudo('python3 pip.pyz install {wheel}'.format(wheel=wheel), hide=True)
+            c.sudo('python3 pip.pyz install {wheel}'.format(wheel=wheel_name), hide=True)
+            c.sudo('rm {wheel}}'.format(wheel=wheel_name), hide=True)
             log.info("Python package {package} installed on {ip_addr}".format(package=package, ip_addr=ip_addr))
         except Exception:
-            log.warning("Failed to install Python package {package} on {ip_addr}".format(package=package, ip_addr=ip_addr))
-        
+            log.error("Failed to install Python package {package} on {ip_addr}".format(package=package, ip_addr=ip_addr))
+            sys.exit(1)
+
         # Close connection and remove downloaded package.
         c.close()
-        os.chdir("..")
         return True
 
     def _add_camera_control_script_to_crontab(self, ip_addr: str):
         # Add the control script to the crontab if not already added.
-        crontab_cmd = "@reboot python3 /home/{username}/camera.py".format(username=self.username)
-        autostart_cmd = '(crontab -l ; echo "' + crontab_cmd + '") | crontab -'
+        crontab_cmd = "@reboot python3 /home/{username}/camera.py\n".format(username=self.username)
+        crontab = open("crontab", "a")
+        crontab.write(crontab_cmd)
+        crontab.close()
         try:
             c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
-            result = c.run("crontab -l", hide=True)
+            result = c.run("crontab -l", hide=True, warn=True)
             if crontab_cmd in result.stdout:
                 log.info("Control script already set to autostart on {ip_addr}".format(ip_addr=ip_addr))
             else:
                 log.info("Adding control script to the crontab on {ip_addr}".format(ip_addr=ip_addr))
-                c.run(autostart_cmd, hide=True)
+                c.put('crontab', '/home/{username}/crontab'.format(username=self.username))
+                log.info("Uploaded crontab script to {ip_addr}".format(ip_addr=ip_addr))
+                c.run('crontab /home/{username}/crontab'.format(username=self.username), hide=True)
+                c.sudo('rm crontab', hide=True)
                 log.info("Control script added to the crontab on {ip_addr}".format(ip_addr=ip_addr))
-            c.close()
-        except Exception:
-            log.warning("Failed to add control script to the crontab on {ip_addr}".format(ip_addr=ip_addr))
-        self._reboot_camera(ip_addr)
+        except Exception as e:   
+            log.error(e)
+            log.error("Failed to add control script to the crontab on {ip_addr}".format(ip_addr=ip_addr))
+            sys.exit(1)
+        os.system("rm crontab")
 
     def _reboot_camera(self, ip_addr: str):
         log.info("Rebooting {ip_addr}".format(ip_addr=ip_addr))
@@ -313,6 +477,3 @@ class Controller:
         finally:
             s.close()
         return ip
-        
-if __name__ == "__main__": 
-    test = Controller()

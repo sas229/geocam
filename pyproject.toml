@@ -1,15 +1,14 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = [
+  "setuptools ~=63.2.0",
+  "wheel ~=0.37.1",
+]
+build-backend = "setuptools.build_meta"
 
-# [tool.hatch.build]
-# include = [
-#   "src/geocam/camera.py"
-# ]
 
 [project]
 name = "geocam"
-version = "0.0.1"
+version = "0.0.6"
 authors = [
   { name="Hilario Greggi", email="greggi.hilario@gmail.com" },
   { name="Sam Stanier", email="sas229@cam.ac.uk" },
@@ -31,7 +30,9 @@ dependencies = [
     "numpy==1.23.3",
     "networkscan==1.0.9",
     "fabric==3.1.0",
-    "getpass4==0.0.14.1"
+    "getpass4==0.0.14.1",
+    "getmac==0.9.4",
+    "requests==2.31.0",
 ]
 
 [project.urls]

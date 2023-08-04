@@ -1,2 +1,2 @@
-import geocam.log
-import geocam.controller
+from geocam import log
+from geocam import controller
