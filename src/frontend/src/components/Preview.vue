@@ -4,7 +4,7 @@
       <label for="preview">Camera selected</label>
       <select id="preview" @change="previewSelected" v-model="previewCamera" required>
         <option disabled value="" selected>Select a camera...</option>
-        <option v-for="camera in Object.keys(cameras)">{{ camera }}</option>
+        <option v-for="camera in Object.keys(store.cameras)">{{ camera }}</option>
       </select>
       <img v-if="previewCamera != ''" :src="preview" alt="Preview placeholder" class="container"> 
     </div>
@@ -56,8 +56,9 @@
 import { ref } from 'vue'
 import { useGeocamStore } from '@/stores/geocam'
 
+// Reactive state.
+const store = useGeocamStore()
 const awbEnabled = ref('False')
-let cameras = useGeocamStore().cameras
 const previewCamera = ref('')
 const preview = ref("https://picsum.photos/800/600")
 

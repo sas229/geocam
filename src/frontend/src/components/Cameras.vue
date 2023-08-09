@@ -16,13 +16,13 @@
       <th>TCP</th>
       <th>Camera</th>
     </tr>
-    <tr v-for="camera in Object.keys(cameras)">
+    <tr v-for="camera in Object.keys(store.cameras)">
       <td>{{ camera }}</td>
-      <td>{{ cameras[camera].ip }}</td>
-      <td>{{ cameras[camera].mac }}</td>
-      <td v-if="cameras[camera].tcp"><i class="fa fa-check" aria-hidden="true"></i></td>
+      <td>{{ store.cameras[camera].ip }}</td>
+      <td>{{ store.cameras[camera].mac }}</td>
+      <td v-if="store.cameras[camera].tcp"><i class="fa fa-check" aria-hidden="true"></i></td>
       <td v-else><i class="fa fa-times" aria-hidden="true"></i></td>
-      <td v-if="cameras[camera].ready"><i class="fa fa-check" aria-hidden="true"></i></td>
+      <td v-if="store.cameras[camera].ready"><i class="fa fa-check" aria-hidden="true"></i></td>
       <td v-else><i class="fa fa-times" aria-hidden="true"></i></td>
     </tr>
   </table> 
@@ -45,6 +45,7 @@ import axios from 'axios'
 import { useGeocamStore } from '@/stores/geocam'
 
 // Reactive state.
+const store = useGeocamStore()
 const username = ref('')
 const password = ref('')
 const usernameValid = ref(false)
@@ -52,7 +53,6 @@ const passwordValid = ref(false)
 const findingCameras = ref(false)
 const log_message = ref('Current log message from Python backend...')
 const configured = ref(false)
-let cameras = useGeocamStore().cameras
 const loginValid = ref(true)
 
 // Functions.
@@ -101,8 +101,8 @@ async function findCameras() {
       data: data
     });
     console.log(response.data);
-    cameras = response.data;
-    if (Object.keys(cameras).length > 0) {
+    store.cameras = response.data;
+    if (Object.keys(store.cameras).length > 0) {
       configured.value = true;
     }
     toggleFindingCameras();
