@@ -4,7 +4,6 @@ export const useGeocamStore = defineStore('geocam', {
   state: () => {
     return { 
       cameras: {},
-      test: 'test',
    }
   },
 })

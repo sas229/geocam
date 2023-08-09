@@ -54,7 +54,6 @@ const log_message = ref('Current log message from Python backend...')
 const configured = ref(false)
 let cameras = useGeocamStore().cameras
 const loginValid = ref(true)
-let test = useGeocamStore().test
 
 // Functions.
 function toggleFindingCameras() {
@@ -90,7 +89,6 @@ function clearConfiguration() {
 
 async function findCameras() {
   toggleFindingCameras();
-  console.log(test)
   try {
     let url = '/findCameras';
     let data = {
