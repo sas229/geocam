@@ -100,7 +100,6 @@ async function findCameras() {
       url: url,
       data: data
     });
-    console.log(response.data);
     store.cameras = response.data;
     if (Object.keys(store.cameras).length > 0) {
       configured.value = true;

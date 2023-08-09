@@ -1,6 +1,6 @@
 <template>
     <div>
-        <details open>
+        <details open="true">
             <summary>Overview</summary>
             <p>
                 geocam is a simple package written in Python and Vue.js that can be used to find, 

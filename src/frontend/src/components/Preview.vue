@@ -9,7 +9,7 @@
       <img v-if="previewCamera != ''" :src="preview" alt="Preview placeholder" class="container"> 
     </div>
     <br>
-    <details>
+    <details :open="settingsOpen.value">
       <br>
       <summary>Settings</summary>
       <div class="scrollable container">
@@ -53,24 +53,44 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onActivated, onDeactivated} from 'vue'
 import { useGeocamStore } from '@/stores/geocam'
 
-// Reactive state.
 const store = useGeocamStore()
 const awbEnabled = ref('False')
 const previewCamera = ref('')
+const settingsOpen = ref(false)
 const preview = ref("https://picsum.photos/800/600")
+
+const camerasWithPreview = computed(() => {
+  let cameras = store.cameras
+  for (let camera in Object.keys(store.cameras)) {
+    if (store.cameras[camera].ready === false) {
+      delete cameras[camera]
+    }
+  }
+  return cameras
+})
 
 function settingChanged(event) {
     console.log(event.target.id + " changed to " + event.target.value)
 }
+
+onActivated(() => {
+  previewCamera.value = ''
+  settingsOpen.value = false
+  console.log("Preview page activated.")
+})
+
+onDeactivated(() => {
+  console.log("Preview page deactivated.")
+})
 </script>
 
 <style scoped>
 .scrollable{
-    overflow-y: auto;
-    max-height: 300px;
+  overflow-y: auto;
+  max-height: 300px;
 }
 
 </style>
