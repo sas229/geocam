@@ -9,6 +9,9 @@ numpy = "1.23.3"
 fabric = "3.1.0"
 getpass4 = "0.0.14.1"
 getmac = "0.9.4"
+flask = "*"
+flask-cors = "*"
+pillow = "*"
 
 [dev-packages]
 build = "*"

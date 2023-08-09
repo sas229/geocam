@@ -33,6 +33,7 @@ dependencies = [
     "getpass4==0.0.14.1",
     "getmac==0.9.4",
     "requests==2.31.0",
+    "flask==2.3.2",
 ]
 
 [project.urls]

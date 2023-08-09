@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>geocam</title>
+    <meta
+      name="description"
+      content="A webserver for geocam. Built with Pico CSS."
+    />
+    <link rel="shortcut icon" href="https://picocss.com/favicon.ico" />
+    <link rel="canonical" href="https://picocss.com/examples/basic-template/" />
+
+    <!-- Pico.css -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  </head>
+  
+  <body>
+    <main class="container">
+        <nav aria-label="breadcrumb">
+            <ul>
+              <li><a onclick="openTab(event, 'Configuration')">Configuration</a></li>
+              <li><a onclick="openTab(event, 'Preview')">Preview</a></li>
+              <li><a onclick="openTab(event, 'Capture')">Capture</a></li>
+            </ul>
+          </nav>
+
+        <div id="Configuration" class="tabcontent">
+            <div class="grid">
+                <input type="text" id="id" name="id" placeholder="id">
+                <input type="password" id="password" name="password" placeholder="password">
+                <button id="find_cameras" onclick="findCameras()">Find Cameras</button>
+                <button id="load_config">Load</button>
+                <button id="save_config">Save</button>
+            </div>
+            <table>
+                <tr>
+                    <th>Hostname</th>
+                    <th>IP</th>
+                    <th>MAC</th>
+                    <th>TCP</th>
+                    <th>Ready?</th>
+                </tr>
+                <tr>
+                    <td>rp1</td>
+                    <td>192.168.0.224</td>
+                    <td>a1:b2:c3:d4:e5</td>
+                    <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                    <td><i class="fa fa-times" aria-hidden="true"></i></td>
+                </tr>
+                <tr>
+                    <td>rp2</td>
+                    <td>192.168.0.238</td>
+                    <td>a1:b2:c3:d4:e7</td>
+                    <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                    <td><i class="fa fa-check" aria-hidden="true"></i></td>
+                  </tr>
+              </table> 
+          </div>
+          
+          <div id="Preview" class="tabcontent">
+            <p>Preview to go here...</p>
+          </div>
+
+          <div id="Capture" class="tabcontent">
+            <p>Capture to go here...</p>
+          </div>
+        
+    </main>
+  </body>
+
+</html>
+
+<script>
+function findCameras() {
+    find_cameras_button = document.getElementById("find_cameras");
+    find_cameras_button.innerHTML = "Finding...";
+    find_cameras_button.disabled = true;
+    id_input = document.getElementById("id");
+    id_input.disabled = true;
+    password_input = document.getElementById("password");
+    password_input.disabled = true;
+    const id = document.getElementById("id").value;
+    const password = document.getElementById("password").value;
+    const data = {"id": id, "password": password};
+    const url = 'http://localhost:8001/cameras'
+    fetch(url, {
+        method: 'POST', 
+        headers:{
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data),
+    })
+    .then(response => response.json())  
+    .then(json => {
+        console.log(json);
+    })
+    .then(() => {
+        find_cameras_button.innerHTML = "Find Cameras";
+        find_cameras_button.disabled = false;
+        id_input.disabled = false;
+        password_input.disabled = false;
+    })
+}
+
+function openTab(evt, tabName) {
+    // Declare all variables
+    var i, tabcontent, tablinks;
+  
+    // Get all elements with class="tabcontent" and hide them
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+      tabcontent[i].style.display = "none";
+    }
+  
+    // Get all elements with class="tablinks" and remove the class "active"
+    tablinks = document.getElementsByClassName("tablinks");
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+  
+    // Show the current tab, and add an "active" class to the button that opened the tab
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+  } 
+
+</script>

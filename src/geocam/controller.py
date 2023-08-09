@@ -2,6 +2,7 @@ import concurrent.futures
 from fabric import Connection
 import geocam as gc
 import geocam.dependencies as deps
+# import backend.server as server
 import getmac
 from getpass4 import getpass
 from importlib import resources as impresources
@@ -29,7 +30,7 @@ TCP_PORT = 1645
 
 class Controller:
 
-    def __init__(self, configuration: str=None):
+    def __init__(self, configuration: str=None, password: str=None):
         log.debug("Created a Controller instance.")
         self.ip = self._get_ip()
         self.cameras = {}
@@ -38,8 +39,9 @@ class Controller:
             self.cameras = json.load(c)
             self.id = configuration.rsplit( ".", 1 )[ 0 ]
             self.username = self.id
-            self._set_ssh_credentials()
-
+        if password is not None:
+            self.password = password
+            
         # Dependencies.
         self.camera_control_script = (impresources.files(gc) / 'camera.py')
         self.launch_script = (impresources.files(gc) / 'launch.py')
@@ -78,7 +80,21 @@ class Controller:
         log.debug("Stopping camera threads.")
         self._close_TCP_connections()
         log.debug("Deleted a Controller instance.")
-        
+
+    def capture_images(self, number: int=1, interval: float=0.0, recover: bool=True):
+        # Send the command. Do this in a loop here with timing controlled by the controller.
+        # command = {"command": "capture", "args": {"number": number, "interval": interval, "recover": recover}}
+        # self._send_command(command)
+        log.info("Capturing images.")
+
+        # Close TCP connections.
+        self._close_TCP_connections()
+
+    def reboot_cameras(self):
+        for camera in self.cameras:
+            ip_addr = self.cameras[camera]['ip']
+            self._reboot_camera(ip_addr)
+
     def find_cameras(self, id: str, network: str=None, password: str=None) -> dict:
         # SSH credentials.
         self.id = id
@@ -140,6 +156,7 @@ class Controller:
 
             #Check status of cameras communications.
             self._check_status()
+            self._close_TCP_connections()
             return self.cameras
         else:
             log.warning("No RPi cameras found on the network.")
@@ -148,7 +165,7 @@ class Controller:
     def save_configuration(self) -> None:
         filename = self.id + ".json"
         if len(self.cameras) == 0:
-            log.warning("No cameras found. No configuration to save...")
+            log.warning("No cameras found. No configuration to save.")
             return
         log.debug("Saving configuration to {filename}".format(filename=filename))
         with open(filename, 'w') as outfile:
@@ -158,7 +175,7 @@ class Controller:
     def restart_cameras(self):
         log.info("Restarting all cameras...")
         if len(self.cameras) == 0:
-            log.warning("No cameras found. Run find_cameras() or pass in a configuration...")
+            log.warning("No cameras found. Run find_cameras() or pass in a configuration.")
             return
         for camera in self.cameras:
             ip = self.cameras[camera]["ip"]
@@ -198,7 +215,6 @@ class Controller:
                     self.cameras[hostname]["ready"] = self._check_camera_hardware(ip_addr) # Check camera.
                     self.tcp_connections += 1
                     log.info("Camera at {ip} is ready for acquisition via TCP".format(ip=ip_addr)) 
-        self._close_TCP_connections()
 
         # Check all cameras have been found.
         found_all_cameras = True
@@ -219,13 +235,14 @@ class Controller:
         start_time = time.time()
         elapsed_time = 0.0
         timeout = 20.0
-        while elapsed_time < timeout and not connected:
+        while elapsed_time < timeout and not connected and thread_running.is_set():
             try:
                 TCP_socket.connect((ip, TCP_PORT))
                 log.info("Connected to camera via TCP on {ip}:{port}".format(ip=ip, port = TCP_PORT))
                 connected = True
+                start_time = time.time()
             except Exception:
-                time.sleep(5)
+                time.sleep(1)
 
             if connected:
                 log.info("Waiting for response via TCP from camera at {ip}".format(ip=ip))
@@ -241,11 +258,13 @@ class Controller:
                         if "response" in message:
                             self.message_buffer.put(message)
                             connected = False
+                        if "image" in message:
+                            log.debug("Saving image...")
+                            # Save image to file.
                     except Exception:
                         pass
             elapsed_time = time.time() - start_time
         TCP_socket.close()
-        log.warning("Failed to open TCP connection to camera at {ip}".format(ip=ip))
 
     def _close_TCP_connections(self) -> None:
         # Close TCP connections to cameras.
