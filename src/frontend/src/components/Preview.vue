@@ -65,7 +65,6 @@ const preview = ref("https://picsum.photos/800/600")
 function settingChanged(event) {
     console.log(event.target.id + " changed to " + event.target.value)
 }
-
 </script>
 
 <style scoped>
