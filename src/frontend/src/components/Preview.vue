@@ -1,8 +1,8 @@
 <template>
   <main>
     <div>
-      <label for="preview">Camera selected</label>
-      <select id="preview" @change="previewSelected" v-model="previewCamera" required>
+      <label for="previewSelect">Camera selected</label>
+      <select id="previewSelect" @change="setPreviewCamera" v-model="previewCamera" required>
         <option disabled value="" selected>Select a camera...</option>
         <option v-for="camera in Object.keys(store.cameras)">{{ camera }}</option>
       </select>
@@ -53,37 +53,48 @@
 </template>
 
 <script setup>
-import { ref, computed, onActivated, onDeactivated} from 'vue'
+import { ref, onActivated, onDeactivated } from 'vue'
 import { useGeocamStore } from '@/stores/geocam'
+import axios from 'axios'
+axios.defaults.baseURL = "http://0.0.0.0:8001/";
 
 const store = useGeocamStore()
 const awbEnabled = ref('False')
 const previewCamera = ref('')
 const settingsOpen = ref(false)
-const preview = ref("https://picsum.photos/800/600")
-
-const camerasWithPreview = computed(() => {
-  let cameras = store.cameras
-  for (let camera in Object.keys(store.cameras)) {
-    if (store.cameras[camera].ready === false) {
-      delete cameras[camera]
-    }
-  }
-  return cameras
-})
+const preview = ref("http://0.0.0.0:8001/preview")
 
 function settingChanged(event) {
     console.log(event.target.id + " changed to " + event.target.value)
 }
 
+async function setPreviewCamera() {
+  console.log("Setting preview camera to " + previewCamera.value)
+  try {
+    let data = {
+      previewCamera: previewCamera.value
+    }
+    let response = await axios({
+      method: 'post',
+      url: '/setPreviewCamera',
+      data: data
+    })
+    console.assert(response.data.success === true)
+    return Promise.resolve(response);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 onActivated(() => {
   previewCamera.value = ''
   settingsOpen.value = false
-  console.log("Preview page activated.")
 })
 
 onDeactivated(() => {
-  console.log("Preview page deactivated.")
+  previewCamera.value = '';
+  setPreviewCamera();
+  console.log("Preview deactivated");
 })
 </script>
 

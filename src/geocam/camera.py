@@ -1,13 +1,15 @@
 import getmac
 import json
 import logging
-import os
 import socket
 import struct
 import json
 from time import sleep
 import threading
 from queue import Queue
+from picamera2 import Picamera2
+from PIL import Image
+import io
 
 # Initialise log at default settings.
 log = logging.getLogger(__name__)
@@ -41,6 +43,12 @@ class Camera:
         self.thread_running = threading.Event()
         self.thread_running.set()
         self.buffer = Queue()
+
+        # Camera configuration.
+        self.camera = Picamera2()
+        self.camera_config = self.camera.create_still_configuration()
+        self.camera.configure(self.camera_config)
+        self.camera.start()
 
         # Standby for commands.
         self._stand_by_for_commands()
@@ -162,6 +170,10 @@ class Camera:
                 self.udp_socket.close()
                 log.info("UDP socket closed.")
     
+    def _capture_image(self, filename: str) -> None:
+        filepath = "images/" + filename + ".jpg"
+        self.camera.capture_file(filepath, format="jpeg")
+
     def _execute(self, command: str, ip_addr: str):
         log.debug("Command recieved from {ip_addr}: {command}".format(command=command, ip_addr=ip_addr[0]))
         if command["command"] == "get_hostname_ip_mac":

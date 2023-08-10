@@ -31,9 +31,9 @@
       <article class="fixedWidth">
         <h3>Finding cameras...</h3>
         <progress></progress>
-        <!-- <footer class="leftAligned">
-          <small >{{ log_message }}</small>
-        </footer> -->
+        <footer class="leftAligned">
+          <small >{{ logMessage }}</small>
+        </footer>
       </article>
     </dialog>
   </div>
@@ -41,8 +41,9 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
 import { useGeocamStore } from '@/stores/geocam'
+import axios from 'axios'
+axios.defaults.baseURL = "http://0.0.0.0:8001/";
 
 // Reactive state.
 const store = useGeocamStore()
@@ -51,7 +52,7 @@ const password = ref('')
 const usernameValid = ref(false)
 const passwordValid = ref(false)
 const findingCameras = ref(false)
-const log_message = ref('Current log message from Python backend...')
+const logMessage = ref('')
 const configured = ref(false)
 const loginValid = ref(true)
 
@@ -88,23 +89,48 @@ function clearConfiguration() {
 }
 
 async function findCameras() {
+  logMessage.value = 'Connecting to server';
   toggleFindingCameras();
   try {
-    let url = '/findCameras';
     let data = {
       username: username.value,
       password: password.value
     }
+    let messageUpdated = false;
+    const logMessageInterval = setInterval(async () => {
+      if (!messageUpdated) {
+        await getLogMessage();
+        messageUpdated = true;
+      } else {
+        messageUpdated = false;
+      }
+    }, 50);
     let response = await axios({
       method: 'post',
-      url: url,
+      url: '/findCameras',
       data: data
     });
+    clearInterval(logMessageInterval);
     store.cameras = response.data;
     if (Object.keys(store.cameras).length > 0) {
       configured.value = true;
     }
     toggleFindingCameras();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function getLogMessage() {
+  try {
+    let response = await axios({
+      method: 'get',
+      url: '/logMessage'
+    });
+    if (response.data.logMessage != '') {
+      logMessage.value = response.data.logMessage;
+    }
+    return Promise.resolve(response);
   } catch (error) {
     console.error(error);
   }
