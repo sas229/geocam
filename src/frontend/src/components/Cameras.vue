@@ -1,10 +1,10 @@
 <template>
   <div class="grid">
-    <button @click="loadConfiguration" data-tooltip="Load a configuration...">Load</button>
+    <input v-if="!configured" @change="checkLogin" type="text" v-model="id" placeholder="id" :aria-invalid="!idValid" data-tooltip="Input the RPi id to search for...">
+    <input v-if="!configured" @change="checkLogin" type="text" v-model="password" placeholder="password" :aria-invalid="!passwordValid" data-tooltip="Input the RPi password to search for...">
+    <button @click="selectConfiguration" :disabled="!loginValid" data-tooltip="Load a configuration...">Load</button>
     <button v-if="configured" @click="saveConfiguration" data-tooltip="Save the configuration...">Save</button>
     <button v-if="configured" @click="clearConfiguration" data-tooltip="Clear the configuration...">Clear</button>
-    <input v-if="!configured" @change="checkLogin" type="text" v-model="username" placeholder="username" :aria-invalid="!usernameValid" data-tooltip="Input the RPi username to search for...">
-    <input v-if="!configured" @change="checkLogin" type="text" v-model="password" placeholder="password" :aria-invalid="!passwordValid" data-tooltip="Input the RPi password to search for...">
     <button v-if="!configured" @click="findCameras" class="contrast" :disabled="!loginValid" data-tooltip="Find cameras with current ID and password...">Find Cameras</button>
   </div>
   <br>
@@ -37,6 +37,17 @@
       </article>
     </dialog>
   </div>
+  <div v-if="loadingConfiguration">
+    <dialog open>
+      <article class="fixedWidth">
+        <h3>Loading configuration...</h3>
+        <progress></progress>
+        <footer class="leftAligned">
+          <small >{{ logMessage }}</small>
+        </footer>
+      </article>
+    </dialog>
+  </div>
 </template>
 
 <script setup>
@@ -47,45 +58,137 @@ axios.defaults.baseURL = "http://0.0.0.0:8001/";
 
 // Reactive state.
 const store = useGeocamStore()
-const username = ref('')
+const id = ref('')
 const password = ref('')
-const usernameValid = ref(false)
+const idValid = ref(false)
 const passwordValid = ref(false)
 const findingCameras = ref(false)
+const loadingConfiguration = ref(false)
 const logMessage = ref('')
 const configured = ref(false)
-const loginValid = ref(true)
+const loginValid = ref(false)
 
 // Functions.
 function toggleFindingCameras() {
   findingCameras.value = !findingCameras.value
 }
 
+function toggleLoadingConfiguration() {
+  loadingConfiguration.value = !loadingConfiguration.value
+}
+
 function checkLogin() {
   console.log("Checking login details...")
-  usernameValid.value = username.value != '' ? true :  false
-  console.log("usernameValid: " + usernameValid.value)
-  console.log("username: " + username.value)
+  idValid.value = id.value != '' ? true :  false
+  console.log("idValid: " + idValid.value)
+  console.log("id: " + id.value)
   passwordValid.value = password.value != '' ? true :  false
   console.log("passwordValid: " + passwordValid.value)
   console.log("password: " + password.value)
-  loginValid.value = (username.value != '' && password.value != '') ? true : false
+  loginValid.value = (id.value != '' && password.value != '') ? true : false
 }
 
-function loadConfiguration() {
-  console.log('Loading configuration...')  
+function selectConfiguration() {
+  console.log('Selecting configuration...')  
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    toggleLoadingConfiguration();
+    console.log("Configuration selected") 
+    // Get the file reference.
+    let file = e.target.files[0]; 
+
+    // Set up the reader.
+    let reader = new FileReader();
+    reader.readAsText(file,'UTF-8');
+
+    // Read the configuration file.
+    let configuration;
+    reader.onload = readerEvent => {
+      configuration = JSON.parse(readerEvent.target.result);
+
+      // Load the configuration in the backend.
+      let data = {
+        configuration: configuration,
+        id: id.value,
+        password: password.value,
+      }
+      loadConfiguration(data);
+    }
+  }
+  input.click();
+}
+
+async function loadConfiguration(data) {
+  console.log('Loading configuration')
+  try {
+    let messageUpdated = false;
+    const logMessageInterval = setInterval(async () => {
+      if (!messageUpdated) {
+        await getLogMessage();
+        messageUpdated = true;
+      } else {
+        messageUpdated = false;
+      }
+    }, 50);
+    let response = await axios({
+      method: 'post',
+      url: '/loadConfiguration',
+      data: data
+    });
+    clearInterval(logMessageInterval);
+    store.cameras = response.data;
+    if (Object.keys(store.cameras).length > 0) {
+      configured.value = true;
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  toggleLoadingConfiguration();
 }
 
 function saveConfiguration() {
   console.log('Saving configuration...')
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(store.cameras, null, 4)], {
+    type: "text/plain"
+  }));
+  let filename = id.value + ".json"
+  a.setAttribute("download", filename);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
-function clearConfiguration() {
+async function clearConfiguration() {
   console.log('Clearing configuration...')
   configured.value = false
-  username.value = ''
+  id.value = ''
   password.value = ''
+  store.cameras = {}
   checkLogin()
+  let data = {
+    configuration: {},
+    id: id.value,
+    password: password.value,
+  }
+  console.log('Clearing configuration')
+  try {
+    let response = await axios({
+      method: 'post',
+      url: '/clearConfiguration',
+      data: data
+    });
+    store.cameras = response.data;
+    if (Object.keys(store.cameras).length > 0) {
+      configured.value = true;
+    } else {
+      configured.value = false;
+    }
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function findCameras() {
@@ -93,7 +196,7 @@ async function findCameras() {
   toggleFindingCameras();
   try {
     let data = {
-      username: username.value,
+      id: id.value,
       password: password.value
     }
     let messageUpdated = false;

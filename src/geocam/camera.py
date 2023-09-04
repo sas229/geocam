@@ -8,8 +8,7 @@ from time import sleep
 import threading
 from queue import Queue
 from picamera2 import Picamera2
-from PIL import Image
-import io
+import base64
 
 # Initialise log at default settings.
 log = logging.getLogger(__name__)
@@ -29,6 +28,64 @@ ch.setFormatter(formatter)
 # Add ch to logger.
 log.addHandler(ch)
 
+import io
+import logging
+import socketserver
+from http import server
+from threading import Condition
+
+from picamera2.encoders import JpegEncoder
+from picamera2.outputs import FileOutput
+
+class StreamingOutput(io.BufferedIOBase):
+    def __init__(self):
+        self.frame = None
+        self.condition = Condition()
+
+    def write(self, buf):
+        with self.condition:
+            self.frame = buf
+            self.condition.notify_all()
+
+
+class StreamingHandler(server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(301)
+            self.send_header('Location', '/stream.mjpg')
+            self.end_headers()
+        elif self.path == '/stream.mjpg':
+            self.send_response(200)
+            self.send_header('Age', 0)
+            self.send_header('Cache-Control', 'no-cache, private')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+            self.end_headers()
+            try:
+                while True:
+                    with output.condition:
+                        output.condition.wait()
+                        frame = output.frame
+                    self.wfile.write(b'--FRAME\r\n')
+                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Length', len(frame))
+                    self.end_headers()
+                    self.wfile.write(frame)
+                    self.wfile.write(b'\r\n')
+            except Exception as e:
+                logging.warning(
+                    'Removed streaming client %s: %s',
+                    self.client_address, str(e))
+        else:
+            self.send_error(404)
+            self.end_headers()
+
+
+class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
 class Camera: 
     # Network settings.
     MCAST_GRP = '225.1.1.1'
@@ -46,9 +103,14 @@ class Camera:
 
         # Camera configuration.
         self.camera = Picamera2()
-        self.camera_config = self.camera.create_still_configuration()
-        self.camera.configure(self.camera_config)
-        self.camera.start()
+
+        self.camera.configure(self.camera.create_video_configuration(main={"size": (1280, 960)}))
+        output = StreamingOutput()
+        self.camera.start_recording(JpegEncoder(), FileOutput(output))
+        
+        # self.camera_config = self.camera.create_still_configuration()
+        # self.camera.configure(self.camera_config)
+        # self.camera.start()
 
         # Standby for commands.
         self._stand_by_for_commands()
@@ -140,8 +202,14 @@ class Camera:
         self.thread_running.clear()
         self.TCP_thread.join()
 
+    def _preview_server(self):
+        print("Starting preview server.")
+        address = ('', 8000)
+        server = StreamingServer(address, StreamingHandler)
+        server.serve_forever()
+
     def _stand_by_for_commands(self) -> None:
-        # Wait until an Ip address is assigned, then update IP and MAC addresses.
+        # Wait until an IP address is assigned, then update IP and MAC addresses.
         log.debug("Waiting for network connection.")
         while self._get_ip_address() == "none":
             sleep(1)
@@ -159,6 +227,10 @@ class Camera:
         self.TCP_thread = threading.Thread(target=self._open_TCP_thread, args=(self.thread_running, self.buffer,))
         self.TCP_thread.start()
 
+        # Open the preview thread and start server.
+        self.preview_thread = threading.Thread(target=self._preview_server)
+        self.preview_thread.start()
+
         # Listen for incoming commands on UDP.
         while True:
             try: 
@@ -167,14 +239,13 @@ class Camera:
                 command = json.loads(data)
                 self._execute(command, ip_addr)
             except Exception: 
-                self.udp_socket.close()
-                log.info("UDP socket closed.")
+                pass
     
     def _capture_image(self, filename: str) -> None:
         filepath = "images/" + filename + ".jpg"
         self.camera.capture_file(filepath, format="jpeg")
 
-    def _execute(self, command: str, ip_addr: str):
+    def _execute(self, command: dict, ip_addr: str):
         log.debug("Command recieved from {ip_addr}: {command}".format(command=command, ip_addr=ip_addr[0]))
         if command["command"] == "get_hostname_ip_mac":
             self.RPI_ADDR_AND_MAC = {"hostname":self._get_hostname(), "ip":self._get_ip_address(), "mac":self._get_mac_address()}
@@ -182,6 +253,22 @@ class Camera:
             json_message = json.dumps(message)
             if self.TCP_connected:
                 self.buffer.put(json_message)
+        elif command["command"] == "start_preview":
+            if command["camera"] == self._get_hostname():
+                print("Starting preview server...")
+        elif command["command"] == "start_preview":
+            if command["camera"] == self._get_hostname():
+                print("Stopping preview server...")
+                # self._capture_image("preview")
+                # log.debug("Opening preview image in binary...")
+                # preview = open("images/preview.jpg", "rb").read()
+                # message = {"preview": base64.b64encode(preview)}
+                # log.debug("Dumping to json...")
+                # json_message = json.dumps(message)
+                # log.debug("Captured preview image.")
+                # if self.TCP_connected:
+                #     self.buffer.put(json_message)
+                #     log.debug("Sent preview image via TCP.")
 
 if __name__ == "__main__": 
     camera = Camera()

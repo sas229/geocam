@@ -62,14 +62,19 @@ const store = useGeocamStore()
 const awbEnabled = ref('False')
 const previewCamera = ref('')
 const settingsOpen = ref(false)
-const preview = ref("http://0.0.0.0:8001/preview")
+let preview = ref("")
 
 function settingChanged(event) {
     console.log(event.target.id + " changed to " + event.target.value)
 }
 
 async function setPreviewCamera() {
-  console.log("Setting preview camera to " + previewCamera.value)
+  if (previewCamera.value === '') {
+    preview = ''
+  } else {
+    console.log('Preview camera changed to ' + previewCamera.value)
+    preview = 'http://' + store.cameras[previewCamera.value].ip + ':8000/stream.mjpg';
+  }
   try {
     let data = {
       previewCamera: previewCamera.value

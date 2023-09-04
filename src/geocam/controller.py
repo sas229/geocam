@@ -16,6 +16,9 @@ import time
 from queue import Queue
 import sys
 import os
+from time import sleep
+import copy
+import base64
 
 # Initialise log at default settings.
 level = logging.INFO
@@ -28,6 +31,8 @@ MCAST_GRP = '225.1.1.1'
 MCAST_PORT = 3179
 TCP_PORT = 1645
 
+frames = [open(f + '.jpg', 'rb').read() for f in ['1', '2', '3']]
+
 class Controller:
 
     def __init__(self, configuration: str=None, password: str=None):
@@ -36,8 +41,9 @@ class Controller:
         log.debug(self.log_message)
         self.ip = self._get_ip()
         self.cameras = {}
-        self.preview_status = False
         self.preview_camera = ""
+        self.waiting_for_preview = True
+        self.i = 0
         self.log_message = ""
         if configuration is not None:
             c = open(configuration, 'r')
@@ -88,15 +94,28 @@ class Controller:
         self.log_message = "Deleted Controller instance."
         log.debug(self.log_message)
 
+    def load_configuration(self, configuration: dict, id: str, password: str) -> dict:
+        self.log_message = "Loading configuration."
+        log.debug(self.log_message)
+        self.cameras = configuration
+        self.id = id
+        self.username = password
+        self._check_status()
+        return self.cameras
+    
+    def clear_configuration(self, configuration: dict, id: str, password: str) -> dict:
+        self.log_message = "Clearing configuration."
+        self.cameras = configuration
+        self.id = id
+        self.username = password
+        return self.cameras
+
     def capture_images(self, number: int=1, interval: float=0.0, recover: bool=True):
         # Send the command. Do this in a loop here with timing controlled by the controller.
         # command = {"command": "capture", "args": {"number": number, "interval": interval, "recover": recover}}
         # self._send_command(command)
         self.log_message = "Capturing images."
         log.info(self.log_message)
-
-        # Close TCP connections.
-        self._close_TCP_connections()
 
     def reboot_cameras(self):
         for camera in self.cameras:
@@ -211,13 +230,35 @@ class Controller:
             log.info(self.log_message)
         time.sleep(1)
 
-    def _set_preview_status(self, status: bool) -> None:
-        self.preview_status = status
+    def _set_preview_camera(self, camera: str, status: bool) -> bool:
+        try:
+            self.preview_camera = camera
+            if status:
+                cmd = {"command": "start_preview", "camera": self.preview_camera}
+                self.log_message = "Started preview on {camera}".format(camera=self.preview_camera)
+            else:
+                cmd = {"command": "stop_preview", "camera": self.preview_camera}
+                self.log_message = "Stopped preview on {camera}".format(camera=self.preview_camera)
+            log.debug(self.log_message)
+            self._send_command(cmd)
+            return True
+        except Exception:
+            log.error("Failed to set preview camera status.")
+            return False
 
-    def _set_preview_camera(self, camera: str) -> None:
-        self.preview_camera = camera
-        self.log_message = "Set preview camera to {camera}".format(camera=camera)
-        log.debug(self.log_message)
+    def _get_preview_image(self) -> bytearray():
+        if self.preview_status:
+            cmd = {"command": "get_preview", "camera": self.preview_camera}
+            self._send_command(cmd)
+            sleep(0.1)
+            preview_location = "images/preview.jpg"
+            preview_destination = "images/" + self.preview_camera + "/preview.jpg"
+            self._recover_image(self.cameras[self.preview_camera]["ip"], preview_location, preview_destination)
+            self.preview_image = open(preview_destination, "rb").read()
+            return bytearray(self.preview_image)
+        else:
+            sleep(0.1)
+            return bytearray()
 
     def _check_status(self) -> bool:
         # Open TCP connection for each camera in a separate thread.
@@ -275,6 +316,7 @@ class Controller:
         TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         connected = False
         self.log_message = "Trying to connect to camera at {ip}".format(ip=ip)
+        self.frontend_log_messages.append(self.log_message)
         log.info(self.log_message)
         start_time = time.time()
         elapsed_time = 0.0
@@ -300,6 +342,7 @@ class Controller:
                 if message == "":
                     connected = False
                     self.log_message = "TCP connection closed by camera at {ip}".format(ip=ip)
+                    self.frontend_log_messages.append(self.log_message)
                     log.warning(self.log_message)
                 else:
                     try:
@@ -311,7 +354,13 @@ class Controller:
                             self.log_message = "Saving image..."
                             log.debug(self.log_message)
                             # Save image to file.
+                        if "preview" in message:
+                            self.log_message = "Receiving preview image..."
+                            log.debug(self.log_message)
+                            self.preview_image = copy.deepcopy(base64.b64decode(message["preview"]))
+                            self.waiting_for_preview = False
                     except Exception:
+                        print(Exception)
                         pass
             elapsed_time = time.time() - start_time
         TCP_socket.close()
@@ -342,6 +391,18 @@ class Controller:
     def _set_ssh_credentials(self):
         print("Input SSH password to use to connect to RPi cameras:")
         self.password = getpass('Password: ')
+
+    def _recover_image(self, ip_addr: str, filename: str, destination: str) -> None:
+        # Recover image from RPi camera.
+        try:
+            c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+            c.get(remote=filename, local=destination)
+            log.debug("Image recovered from {ip_addr}".format(ip_addr=ip_addr))
+            c.close()
+        except Exception:
+            c.close()
+            log.error("Failed to recover image from {ip_addr}".format(ip_addr=ip_addr))
+            pass
         
     def _check_hostname(self, ip_addr: str, id: str) -> bool | str | str:
         # Try to connect to the device via SSH. If successful, get the hostname.
