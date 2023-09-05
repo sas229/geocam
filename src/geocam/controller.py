@@ -31,7 +31,7 @@ MCAST_GRP = '225.1.1.1'
 MCAST_PORT = 3179
 TCP_PORT = 1645
 
-frames = [open(f + '.jpg', 'rb').read() for f in ['1', '2', '3']]
+# frames = [open(f + '.jpg', 'rb').read() for f in ['1', '2', '3']]
 
 class Controller:
 

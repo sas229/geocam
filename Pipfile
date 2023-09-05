@@ -12,6 +12,7 @@ getmac = "0.9.4"
 flask = "*"
 flask-cors = "*"
 pillow = "*"
+geocam = {editable = true, path = "."}
 
 [dev-packages]
 build = "*"
@@ -21,7 +22,6 @@ sphinx-autoapi = "*"
 sphinx-copybutton = "*"
 sphinxcontrib-bibtex = "*"
 sphinx-rtd-theme = "*"
-geocam = {editable = true, path = "."}
 
 [requires]
 python_version = "3"
