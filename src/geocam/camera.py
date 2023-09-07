@@ -88,16 +88,14 @@ class BaseCamera(object):
 
         return BaseCamera.frame
 
-    @staticmethod
-    def frames():
+    def frames(self):
         """"Generator that returns frames from the camera."""
         raise RuntimeError('Must be implemented by subclasses.')
 
-    @classmethod
-    def _thread(cls):
+    def _thread(self):
         """Camera background thread."""
         print('Starting camera thread.')
-        frames_iterator = cls.frames()
+        frames_iterator = self.frames()
         for frame in frames_iterator:
             BaseCamera.frame = frame
             BaseCamera.event.set()  # Send signal to clients.
@@ -106,14 +104,13 @@ class BaseCamera(object):
 class Camera(BaseCamera):
 
     def __init__(self):
-        super(Camera, self).__init__()
         self.camera = Picamera2()
         self.config = self.camera.create_still_configuration()
-        self.camera.cofigure(self.config)
+        self.camera.configure(self.config)
         self.camera.start()
         time.sleep(2)
+        super().__init__()
 
-    @staticmethod
     def frames(self):   
         frame = io.BytesIO()
         while True:
@@ -122,22 +119,12 @@ class Camera(BaseCamera):
             frame.seek(0)
             yield frame.getvalue()
 
-    # @staticmethod
-    # def frames():
-    #     with Picamera2() as camera:
-    #         config = camera.create_still_configuration()
-    #         camera.configure(config)
-    #         camera.start()
-    #         time.sleep(2)
-    #         frame = io.BytesIO()
-    #         while True:
-    #             frame.seek(0)
-    #             camera.capture_file(frame, format='jpeg')
-    #             frame.seek(0)
-    #             yield frame.getvalue()
-
-    def update_controls(self, setting):
-        print(setting)
+    def update_controls(self, controls):
+        self.camera.set_controls(controls)
+        print("Configuration:")
+        print(json.dumps(self.camera.camera_controls))
+        print("Metadata:")
+        print(self.camera.capture_metadata())
 
 # Disable werkzeug logging.
 log = logging.getLogger('werkzeug')
@@ -175,10 +162,12 @@ def update_controls():
         data = request.json
         try:
             for key, value in data.items():
-                camera.update_controls({key: value})
+                control = {key: value}
+                camera.update_controls(control)
+                return jsonify({"success": True})
         except Exception:
             log.error("Unsuccessfully attempted to update camera settings.")
-        return jsonify({"success": True})
+            return jsonify({"success": False})
 
 def capture_frame():
     with open("test.jpg", "wb") as image_file:

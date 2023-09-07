@@ -14,7 +14,8 @@
       <summary>Controls</summary>
       <select @change="setCameraControl" v-model="currentControl">
         <option value="" disabled selected>Select</option>
-        <option value="ExposureTime">Exposure Time (ms)</option>
+        <option value="AeEnable">Auto Exposure Enable</option>
+        <option value="ExposureTime">Exposure Time (μs)</option>
         <option value="ExposureValue">Exposure Value (-)</option>
         <option value="Saturation">Saturation (-)</option>
         <option value="Sharpness">Sharpness (-)</option>
@@ -23,6 +24,13 @@
         <option value="AwbEnable">Auto White Balance Enable</option>
         <option value="AwbMode">Auto White Balance Mode</option>
       </select>
+
+      <div v-if="currentControl === 'AeEnable'" class="container text-center">
+        <select @change="controlChanged" id="AeEnable" v-model="AeEnable">
+          <option>True</option>
+          <option>False</option>
+        </select>
+      </div>
 
       <div v-if="currentControl === 'ExposureTime'" class="container text-center">
         <div class="row centered">
@@ -81,28 +89,29 @@
 
       <div v-if="currentControl === 'NoiseReductionMode'" class="container text-center">
         <select @change="controlChanged" id="NoiseReductionMode">
-            <option>Off</option>
-            <option>Fast</option>
-            <option>HighQuality</option>
+          <option value="0">Off</option>
+          <option value="1">Fast</option>
+          <option value="2">HighQuality</option>
         </select>
       </div>
       
       <div v-if="currentControl === 'AwbEnable'" class="container text-center">
-        <select @change="controlChanged" id="AwbEnable" v-model="AwbEnabled">
-            <option>False</option>
-            <option>True</option>
+        <select @change="controlChanged" id="AwbEnable" v-model="AwbEnable">
+          <option>False</option>
+          <option>True</option>
         </select>
       </div>
       
       <div v-if="currentControl === 'AwbMode'" class="container text-center">
-        <select @change="controlChanged" id="AwbMode" v-model="AwbMode" :disabled="AwbEnabled === 'False'">
-            <option>Auto</option>
-            <option>Tungsten</option>
-            <option>Fluorescent</option>
-            <option>Indoor</option>
-            <option>Daylight</option>
-            <option>Cloudy</option>
-            <option>Custom</option>
+        <select @change="controlChanged" id="AwbMode" v-model="AwbMode" :disabled="AwbEnable === 'False'">
+          <option value="0">Auto</option>
+          <option value="1">Incandescant</option>
+          <option value="2">Tungsten</option>
+          <option value="3">Fluorescent</option>
+          <option value="4">Indoor</option>
+          <option value="5">Daylight</option>
+          <option value="6">Cloudy</option>
+          <option value="7">Custom</option>
         </select>
       </div>
 
@@ -137,14 +146,22 @@ let ExposureValue = ref(0.00)
 let Saturation = ref(1.00)
 let Sharpness = ref(1.00)
 let Brightness = ref(0.00)
-let AwbEnabled = ref('False')
+let AwbEnable = ref('False')
 let AwbMode = ref('Auto')
-
+let AeEnable = ref(true)
 
 async function controlChanged(event) {
   console.log(event.target.id + " changed to " + event.target.value)
-  let control = event.target.id
-  let value  = event.target.value
+  let control = event.target.id;
+  let value;
+  if (control === "AwbEnable") {
+    value = (String(event.target.value).toLowerCase() == "true");
+    console.log("Type: " + typeof value)
+  } else if (control === "AwbMode" || control === "NoiseReductionMode") {
+    value = parseInt(event.target.value)
+  } else {
+    value  = parseFloat(event.target.value);
+  }
   let data = {}
   data[control] = value
   try {
