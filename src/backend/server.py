@@ -25,29 +25,6 @@ controller = gc.controller.Controller()
 def index():
     return render_template('index.html')
 
-@app.route('/preview')
-def preview():
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-@app.route('/image')
-def image():
-    return Response(generate(), mimetype = "multipart/x-mixed-replace; boundary=frame")
-
-def generate():
-    while True:
-        yield b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + controller._get_preview_image() + b'\r\n'
-
-@app.route('/setPreviewCamera', methods=['POST'])
-def setPreviewCamera():
-    if request.method == 'POST':
-        data = request.json
-        camera = data["previewCamera"]
-        if camera != "":
-            success = controller._set_preview_camera(camera, True)
-        elif camera == "":
-            success = controller._set_preview_camera(controller.preview_camera, False)
-        return jsonify({"success": success})
-
 @app.route('/findCameras', methods=['POST'])
 def findCameras():
     if request.method == 'POST':

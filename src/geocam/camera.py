@@ -1,4 +1,4 @@
-from flask import Flask, Response
+from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 import logging
 import socket
@@ -6,6 +6,9 @@ import struct
 import json
 import time
 import threading
+import os
+from picamera2 import Picamera2
+import io
 try:
     from greenlet import getcurrent as get_ident
 except ImportError:
@@ -26,9 +29,9 @@ class CameraEvent(object):
         """Invoked from each client's thread to wait for the next frame."""
         ident = get_ident()
         if ident not in self.events:
-            # this is a new client
-            # add an entry for it in the self.events dict
-            # each entry has two elements, a threading.Event() and a timestamp
+            # This is a new client.
+            # Add an entry for it in the self.events dict.
+            # Each entry has two elements, a threading.Event() and a timestamp.
             self.events[ident] = [threading.Event(), time.time()]
         return self.events[ident][0].wait()
 
@@ -37,16 +40,16 @@ class CameraEvent(object):
         now = time.time()
         remove = None
         for ident, event in self.events.items():
-            if not event[0].isSet():
-                # if this client's event is not set, then set it
-                # also update the last set timestamp to now
+            if not event[0].is_set():
+                # If this client's event is not set, then set it
+                # also updates the last set timestamp to now.
                 event[0].set()
                 event[1] = now
             else:
-                # if the client's event is already set, it means the client
-                # did not process a previous frame
-                # if the event stays set for more than 5 seconds, then assume
-                # the client is gone and remove it
+                # If the client's event is already set, it means the client
+                # did not process a previous frame.
+                # If the event stays set for more than 5 seconds, then assume
+                # the client is gone and remove it.
                 if now - event[1] > 5:
                     remove = ident
         if remove:
@@ -58,9 +61,9 @@ class CameraEvent(object):
 
 
 class BaseCamera(object):
-    thread = None  # background thread that reads frames from camera
-    frame = None  # current frame is stored here by background thread
-    last_access = 0  # time of last client access to the camera
+    thread = None  # Background thread that reads frames from camera.
+    frame = None  # Current frame is stored here by background thread.
+    last_access = 0  # Time of last client access to the camera.
     event = CameraEvent()
 
     def __init__(self):
@@ -68,18 +71,18 @@ class BaseCamera(object):
         if BaseCamera.thread is None:
             BaseCamera.last_access = time.time()
 
-            # start background frame thread
+            # Start background frame thread.
             BaseCamera.thread = threading.Thread(target=self._thread)
             BaseCamera.thread.start()
 
-            # wait until first frame is available
+            # Wait until first frame is available.
             BaseCamera.event.wait()
 
     def get_frame(self):
         """Return the current camera frame."""
         BaseCamera.last_access = time.time()
 
-        # wait for a signal from the camera thread
+        # Wait for a signal from the camera thread.
         BaseCamera.event.wait()
         BaseCamera.event.clear()
 
@@ -97,28 +100,44 @@ class BaseCamera(object):
         frames_iterator = cls.frames()
         for frame in frames_iterator:
             BaseCamera.frame = frame
-            BaseCamera.event.set()  # send signal to clients
+            BaseCamera.event.set()  # Send signal to clients.
             time.sleep(0)
 
-            # if there hasn't been any clients asking for frames in
-            # the last 10 seconds then stop the thread
-            if time.time() - BaseCamera.last_access > 10:
-                frames_iterator.close()
-                print('Stopping camera thread due to inactivity.')
-                break
-        BaseCamera.thread = None
-
 class Camera(BaseCamera):
-    """An emulated camera implementation that streams a repeated sequence of
-    files 1.jpg, 2.jpg and 3.jpg at a rate of one frame per second."""
-    imgs = [open(f + '.jpg', 'rb').read() for f in ['1', '2', '3']]
-    previewOn = False
+
+    def __init__(self):
+        super(Camera, self).__init__()
+        self.camera = Picamera2()
+        self.config = self.camera.create_still_configuration()
+        self.camera.cofigure(self.config)
+        self.camera.start()
+        time.sleep(2)
 
     @staticmethod
-    def frames():
+    def frames(self):   
+        frame = io.BytesIO()
         while True:
-            yield Camera.imgs[int(time.time()) % 3]
-            time.sleep(1)
+            frame.seek(0)
+            self.camera.capture_file(frame, format='jpeg')
+            frame.seek(0)
+            yield frame.getvalue()
+
+    # @staticmethod
+    # def frames():
+    #     with Picamera2() as camera:
+    #         config = camera.create_still_configuration()
+    #         camera.configure(config)
+    #         camera.start()
+    #         time.sleep(2)
+    #         frame = io.BytesIO()
+    #         while True:
+    #             frame.seek(0)
+    #             camera.capture_file(frame, format='jpeg')
+    #             frame.seek(0)
+    #             yield frame.getvalue()
+
+    def update_controls(self, setting):
+        print(setting)
 
 # Disable werkzeug logging.
 log = logging.getLogger('werkzeug')
@@ -128,7 +147,7 @@ log.setLevel(logging.ERROR)
 app = Flask(__name__)
 CORS(app)
 host = "0.0.0.0"
-port = 8000
+port = 8002
 debug = False
 options = None
 
@@ -137,35 +156,36 @@ MCAST_GRP = '225.1.1.1'
 MCAST_PORT = 3179
 TCP_PORT = 1645
 
-previewOn = False
-frame = None
-
 # Create camera instance.
 camera = Camera()
 
-@app.route("/")
-def hello():
-    return "Hello World!"
-
-@app.route("/previewOff")
-def preview_off():
-    camera.previewOn = False
-    print("Stream turned off!")
-    return "Stream turned off!"
-
 def gen():
     yield b'--frame\r\n'
-    camera.previewOn = True
-    while True and camera.previewOn:
+    while True:
         frame = camera.get_frame()
-        print("Yielding frame.")
         yield b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n--frame\r\n'
 
 @app.route('/preview')
 def preview():
     return Response(gen(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-def run_UDP():
+@app.route('/updateControls', methods=['POST'])
+def update_controls():
+    if request.method == 'POST':
+        data = request.json
+        try:
+            for key, value in data.items():
+                camera.update_controls({key: value})
+        except Exception:
+            log.error("Unsuccessfully attempted to update camera settings.")
+        return jsonify({"success": True})
+
+def capture_frame():
+    with open("test.jpg", "wb") as image_file:
+        # Write bytes image to file.
+        image_file.write(camera.frame)
+
+def listen_on_UDP():
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     udp_socket.bind(('', MCAST_PORT)) 
@@ -178,14 +198,14 @@ def run_UDP():
             log.debug("Standing by for commands.")
             data, ip_addr = udp_socket.recvfrom(1024)
             command = json.loads(data)
-            print("Command {command} received from {ip_addr} on UDP.".format(command=command, ip_addr=ip_addr))
-            if command["command"] == "previewOff":
-                preview_off()
+            log.debug("Command {command} received from {ip_addr} on UDP.".format(command=command, ip_addr=ip_addr))
+            if command["command"] == "captureFrame":
+                capture_frame()
         except Exception: 
             pass
 
 if __name__ == "__main__":
-    UDP_thread = threading.Thread(target=run_UDP)
+    UDP_thread = threading.Thread(target=listen_on_UDP)
     UDP_thread.start()
     app.run(host, port, debug, options)
     

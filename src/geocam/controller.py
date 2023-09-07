@@ -31,8 +31,6 @@ MCAST_GRP = '225.1.1.1'
 MCAST_PORT = 3179
 TCP_PORT = 1645
 
-# frames = [open(f + '.jpg', 'rb').read() for f in ['1', '2', '3']]
-
 class Controller:
 
     def __init__(self, configuration: str=None, password: str=None):
@@ -230,36 +228,6 @@ class Controller:
             log.info(self.log_message)
         time.sleep(1)
 
-    def _set_preview_camera(self, camera: str, status: bool) -> bool:
-        try:
-            self.preview_camera = camera
-            if status:
-                cmd = {"command": "start_preview", "camera": self.preview_camera}
-                self.log_message = "Started preview on {camera}".format(camera=self.preview_camera)
-            else:
-                cmd = {"command": "stop_preview", "camera": self.preview_camera}
-                self.log_message = "Stopped preview on {camera}".format(camera=self.preview_camera)
-            log.debug(self.log_message)
-            self._send_command(cmd)
-            return True
-        except Exception:
-            log.error("Failed to set preview camera status.")
-            return False
-
-    def _get_preview_image(self) -> bytearray():
-        if self.preview_status:
-            cmd = {"command": "get_preview", "camera": self.preview_camera}
-            self._send_command(cmd)
-            sleep(0.1)
-            preview_location = "images/preview.jpg"
-            preview_destination = "images/" + self.preview_camera + "/preview.jpg"
-            self._recover_image(self.cameras[self.preview_camera]["ip"], preview_location, preview_destination)
-            self.preview_image = open(preview_destination, "rb").read()
-            return bytearray(self.preview_image)
-        else:
-            sleep(0.1)
-            return bytearray()
-
     def _check_status(self) -> bool:
         # Open TCP connection for each camera in a separate thread.
         found_all_cameras = False
@@ -354,11 +322,6 @@ class Controller:
                             self.log_message = "Saving image..."
                             log.debug(self.log_message)
                             # Save image to file.
-                        if "preview" in message:
-                            self.log_message = "Receiving preview image..."
-                            log.debug(self.log_message)
-                            self.preview_image = copy.deepcopy(base64.b64decode(message["preview"]))
-                            self.waiting_for_preview = False
                     except Exception:
                         print(Exception)
                         pass

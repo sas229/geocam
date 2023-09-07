@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@websitebeaver/vue-magnifier": "^1.1.0",
     "axios": "^1.4.0",
     "pinia": "^2.1.6",
     "vue": "^3.3.4"
