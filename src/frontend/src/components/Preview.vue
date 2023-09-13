@@ -1,6 +1,6 @@
 <template>
   <main>
-    <div>
+    <div v-if="Object.keys(store.cameras).length > 0">
       <label for="previewSelect">Camera selected</label>
       <select id="previewSelect" @change="setPreviewCamera" v-model="previewCamera" required>
         <option disabled value="" selected>Select a camera...</option>
@@ -8,6 +8,7 @@
       </select>
       <VueMagnifier v-if="previewCamera != ''" :src="preview" alt="Preview placeholder" class="container" zoomFactor="3.0" v-bind:mgShowOverflow="false" mgWidth="300" mgHeight="300"/>
     </div>
+    <h6 v-if="Object.keys(store.cameras).length === 0">No cameras currently available...</h6>
     <br>
     <details v-if="previewCamera != ''" :open="controlsOpen.value">
       <br>

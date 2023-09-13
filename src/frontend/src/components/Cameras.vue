@@ -1,6 +1,6 @@
 <template>
   <div class="grid">
-    <input v-if="!configured" @change="checkLogin" type="text" v-model="id" placeholder="id" :aria-invalid="!idValid" data-tooltip="Input the RPi id to search for...">
+    <input v-if="!configured" @change="checkLogin" type="text" v-model="id" placeholder="username" :aria-invalid="!idValid" data-tooltip="Input the RPi id to search for...">
     <input v-if="!configured" @change="checkLogin" type="text" v-model="password" placeholder="password" :aria-invalid="!passwordValid" data-tooltip="Input the RPi password to search for...">
     <button @click="selectConfiguration" :disabled="!loginValid" data-tooltip="Load a configuration...">Load</button>
     <button v-if="configured" @click="saveConfiguration" data-tooltip="Save the configuration...">Save</button>
@@ -89,7 +89,7 @@ function checkLogin() {
 }
 
 function selectConfiguration() {
-  console.log('Selecting configuration...')  
+  console.log('Selecting configuration')  
   var input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -149,7 +149,7 @@ async function loadConfiguration(data) {
 }
 
 function saveConfiguration() {
-  console.log('Saving configuration...')
+  console.log('Saving configuration')
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(store.cameras, null, 4)], {
     type: "text/plain"
@@ -162,7 +162,7 @@ function saveConfiguration() {
 }
 
 async function clearConfiguration() {
-  console.log('Clearing configuration...')
+  console.log('Clearing configuration')
   configured.value = false
   id.value = ''
   password.value = ''

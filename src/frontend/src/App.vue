@@ -9,10 +9,10 @@
     </header>
     <nav aria-label="breadcrumb">
       <ul>
-          <li @click="clickedNav"><a>Cameras</a></li>
-          <li @click="clickedNav"><a>Preview</a></li>
-          <li @click="clickedNav"><a>Capture</a></li>
           <li @click="clickedNav"><a>About</a></li>
+          <li @click="clickedNav"><a>Cameras</a></li>
+          <li @click="clickedNav" v-if="Object.keys(store.cameras).length > 0"><a>Preview</a></li>
+          <li @click="clickedNav" v-if="Object.keys(store.cameras).length > 0"><a>Capture</a></li>
       </ul>
       <br>
     </nav>
@@ -37,8 +37,11 @@ import Cameras from './components/Cameras.vue'
 import Preview from './components/Preview.vue'
 import Capture from './components/Capture.vue'
 import About from './components/About.vue'
+import { useGeocamStore } from '@/stores/geocam'
 
-const currentComponent = ref('Cameras')
+const store = useGeocamStore()
+
+const currentComponent = ref('About')
 
 function clickedNav(event) {
   console.log(event.target.innerText)

@@ -10,7 +10,7 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 # Create Flask app and serve static Vue SPA.
-app = Flask(__name__, static_folder = "./../frontend/dist/assets", template_folder = "./../frontend/dist")
+app = Flask(__name__, static_folder = "./../frontend/app/assets", template_folder = "./../frontend/app")
 # app = Flask(__name__)
 CORS(app)
 host = "0.0.0.0"

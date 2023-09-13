@@ -1,16 +1,19 @@
 <template>
     <main>
-        <div class="grid">
-            <input @change="isNameValid" type="text" placeholder="Name" :aria-invalid="!nameValid" v-model="name" data-tooltip="Image series name...">
-            <input @change="isNumberValid" type="number" placeholder="Number" min="1" step="1" :aria-invalid="!numberValid" v-model="number" data-tooltip="Number of images to capture...">
-            <input @change="isIntervalValid" type="number" placeholder="Interval" min="0" step="0.1" :aria-invalid="!intervalValid" v-model="interval" data-tooltip="Interval between images...">
-            <button @click="captureImages" :disabled="!captureSettingsValid" data-tooltip="Capture images...">Capture</button>
-            <button @click="recoverImages" class="secondary" :disabled="!captureSettingsValid" data-tooltip="Recover images...">Recover</button>
-        </div>
-        <label>
+        <div v-if="Object.keys(store.cameras).length > 0">
+            <div class="grid">
+                <input @change="isNameValid" type="text" placeholder="Name" :aria-invalid="!nameValid" v-model="name" data-tooltip="Image series name...">
+                <input @change="isNumberValid" type="number" placeholder="Number" min="1" step="1" :aria-invalid="!numberValid" v-model="number" data-tooltip="Number of images to capture...">
+                <input @change="isIntervalValid" type="number" placeholder="Interval" min="0" step="0.1" :aria-invalid="!intervalValid" v-model="interval" data-tooltip="Interval between images...">
+                <button @click="captureImages" :disabled="!captureSettingsValid" data-tooltip="Capture images...">Capture</button>
+                <button @click="recoverImages" class="secondary" :disabled="!captureSettingsValid" data-tooltip="Recover images...">Recover</button>
+            </div>
+            <label>
             <input type="checkbox" id="recover" name="recover" v-model="recover">
-            Recover images on-the-fly?
-        </label>
+                Recover images on-the-fly?
+            </label>
+        </div>
+        <h6 v-if="Object.keys(store.cameras).length === 0">No cameras currently available...</h6>   
     </main>
     <div v-if="capturingImages">
     <dialog open>
@@ -31,6 +34,7 @@ import { useGeocamStore } from '@/stores/geocam'
 import axios from 'axios'
 axios.defaults.baseURL = "http://0.0.0.0:8001/";
 
+const store = useGeocamStore()
 const name = ref('')
 const number = ref(0)
 const interval = ref(0)
