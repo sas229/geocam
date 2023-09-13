@@ -13,16 +13,16 @@
       <th>Hostname</th>
       <th>IP</th>
       <th>MAC</th>
-      <th>TCP</th>
+      <th>HTTP</th>
       <th>Camera</th>
     </tr>
     <tr v-for="camera in Object.keys(store.cameras)">
       <td>{{ camera }}</td>
       <td>{{ store.cameras[camera].ip }}</td>
       <td>{{ store.cameras[camera].mac }}</td>
-      <td v-if="store.cameras[camera].tcp"><i class="fa fa-check" aria-hidden="true"></i></td>
+      <td v-if="store.cameras[camera].http"><i class="fa fa-check" aria-hidden="true"></i></td>
       <td v-else><i class="fa fa-times" aria-hidden="true"></i></td>
-      <td v-if="store.cameras[camera].ready"><i class="fa fa-check" aria-hidden="true"></i></td>
+      <td v-if="store.cameras[camera].ready"><i class="fa fa-check" aria-hidden="true"> </i></td>
       <td v-else><i class="fa fa-times" aria-hidden="true"></i></td>
     </tr>
   </table> 
@@ -79,10 +79,10 @@ function toggleLoadingConfiguration() {
 
 function checkLogin() {
   console.log("Checking login details...")
-  idValid.value = id.value != '' ? true :  false
+  idValid.value = id.value != '' ? true : false
   console.log("idValid: " + idValid.value)
   console.log("id: " + id.value)
-  passwordValid.value = password.value != '' ? true :  false
+  passwordValid.value = password.value != '' ? true : false
   console.log("passwordValid: " + passwordValid.value)
   console.log("password: " + password.value)
   loginValid.value = (id.value != '' && password.value != '') ? true : false

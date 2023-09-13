@@ -9,6 +9,8 @@ import threading
 import os
 from picamera2 import Picamera2
 import io
+import getmac
+import requests
 try:
     from greenlet import getcurrent as get_ident
 except ImportError:
@@ -126,6 +128,61 @@ class Camera(BaseCamera):
         print("Metadata:")
         print(self.camera.capture_metadata())
 
+    def _get_hostname(self) -> str: 
+        """
+        Returns the hostname of the current machine.
+
+        Returns
+        -------
+        str
+            The hostname of the current machine.
+        """
+        host_name = socket.gethostname()
+
+        # Logging the host_name before returning
+        log.info("Current hostname: %s", host_name)
+
+        return host_name
+
+    def _get_ip_address(self) -> str:
+        """
+        Returns the IP address of the current machine.
+
+        Returns
+        -------
+        str
+            The hostname of the current machine.
+
+        Raises
+        ------
+        OSError
+            If the IP address could not be retreived.
+        """  
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        try:
+            # Doesn't even have to be reachable.
+            s.connect(('10.254.254.254', 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            ip = "none"
+        finally:
+            s.close()
+        return ip
+
+    def _get_mac_address(self) -> str:
+        """
+        Returns the MAC address of the current machine.
+
+        Returns
+        -------
+        str
+            The MAC address of the current machine.
+        """
+        mac_addr = getmac.get_mac_address()
+        log.info("Current mac_addr: %s", mac_addr)
+        return mac_addr
+
 # Disable werkzeug logging.
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -169,8 +226,11 @@ def update_controls():
             log.error("Unsuccessfully attempted to update camera settings.")
             return jsonify({"success": False})
 
-def capture_frame():
-    with open("test.jpg", "wb") as image_file:
+def capture_frame(args):
+    filename = args["filename"]
+    fmt = args["format"]
+    path = "{filename}.{fmt}".format(filename=filename, fmt=fmt)
+    with open(path, "wb") as image_file:
         # Write bytes image to file.
         image_file.write(camera.frame)
 
@@ -188,8 +248,15 @@ def listen_on_UDP():
             data, ip_addr = udp_socket.recvfrom(1024)
             command = json.loads(data)
             log.debug("Command {command} received from {ip_addr} on UDP.".format(command=command, ip_addr=ip_addr))
+            if command["command"] == "get_hostname_ip_mac":
+                RPI_ADDR_AND_MAC = {"hostname":camera._get_hostname(), "ip":camera._get_ip_address(), "mac":camera._get_mac_address()}
+                message = {"response": RPI_ADDR_AND_MAC}
+                url = "http://{ip_addr}:8001/cameraResponse".format(ip_addr=ip_addr[0])
+                response = requests.post(url, json=message)
+                response_json = response.json()
+                print(response_json)
             if command["command"] == "captureFrame":
-                capture_frame()
+                capture_frame(command["args"])
         except Exception: 
             pass
 

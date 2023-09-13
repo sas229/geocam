@@ -25,6 +25,17 @@ controller = gc.controller.Controller()
 def index():
     return render_template('index.html')
 
+@app.route('/captureImages', methods=['POST'])
+def captureImages():
+    data = request.json
+    name = data['name']
+    number = data['number']
+    interval = data['interval']
+    recover = data['recover']
+    success = controller.capture_images(name, number, interval, recover)
+    response = {"success": success}
+    return jsonify(response)
+
 @app.route('/findCameras', methods=['POST'])
 def findCameras():
     if request.method == 'POST':
@@ -53,6 +64,14 @@ def clearConfiguration():
         password = data["password"]
         cameras = controller.clear_configuration(configuration=configuration, id=id, password=password)
         return jsonify(cameras)
+    
+@app.route('/cameraResponse', methods=['POST'])
+def cameraResponse():
+    if request.method == 'POST':
+        message = request.json
+        controller.message_buffer.put(message)
+        response = {"success": True}
+        return jsonify(response)
 
 @app.route('/logMessage', methods=['GET'])
 def logMessage():

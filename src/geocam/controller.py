@@ -19,6 +19,7 @@ import os
 from time import sleep
 import copy
 import base64
+import time
 
 # Initialise log at default settings.
 level = logging.INFO
@@ -61,11 +62,35 @@ class Controller:
         self.pip_pyz = (impresources.files(deps) / 'pip.pyz')
         self.getmac_wheel_name = 'getmac-0.9.4-py2.py3-none-any.whl'
         self.getmac_wheel = (impresources.files(deps) / 'getmac-0.9.4-py2.py3-none-any.whl')
-
+        self.Flask_wheel_name = 'flask-2.3.3-py3-none-any.whl'
+        self.Flask_wheel = (impresources.files(deps) / 'flask-2.3.3-py3-none-any.whl')
+        self.Flask_Cors_wheel_name = 'Flask_Cors-4.0.0-py2.py3-none-any.whl'
+        self.Flask_Cors_wheel = (impresources.files(deps) / 'Flask_Cors-4.0.0-py2.py3-none-any.whl')
+        self.blinker_wheel_name = 'blinker-1.6.2-py3-none-any.whl'
+        self.blinker_wheel = (impresources.files(deps) / 'blinker-1.6.2-py3-none-any.whl')
+        self.click_wheel_name = 'click-8.1.7-py3-none-any.whl'
+        self.click_wheel = (impresources.files(deps) / 'click-8.1.7-py3-none-any.whl')
+        self.itsdangerous_wheel_name = 'itsdangerous-2.1.2-py3-none-any.whl'
+        self.itsdangerous_wheel = (impresources.files(deps) / 'itsdangerous-2.1.2-py3-none-any.whl')
+        self.Jinja2_wheel_name = 'Jinja2-3.1.2-py3-none-any.whl'
+        self.Jinja2_wheel = (impresources.files(deps) / 'Jinja2-3.1.2-py3-none-any.whl')
+        self.Werkzeug_wheel_name = (impresources.files(deps) / 'werkzeug-2.3.7-py3-none-any.whl')
+        self.Werkzeug_wheel = 'werkzeug-2.3.7-py3-none-any.whl'
+        self.MarkupSafe_wheel_name = 'MarkupSafe-2.1.3.tar.gz'
+        self.MarkupSafe_wheel = (impresources.files(deps) / 'MarkupSafe-2.1.3.tar.gz')
+        
         # Required packages.
         self.required_packages = [
             'getmac',
             'picamera2',
+            'blinker',
+            'click',
+            'itsdangerous',
+            'Jinja2',
+            'Werkzeug',
+            'MarkupSafe',
+            'Flask',
+            'Flask-Cors',
         ]
         
         # Create UDP multicast socket for sending messages.
@@ -88,7 +113,6 @@ class Controller:
     def __del__(self):
         self.log_message = "Stopping camera threads."
         log.debug(self.log_message)
-        self._close_TCP_connections()
         self.log_message = "Deleted Controller instance."
         log.debug(self.log_message)
 
@@ -108,12 +132,23 @@ class Controller:
         self.username = password
         return self.cameras
 
-    def capture_images(self, number: int=1, interval: float=0.0, recover: bool=True):
-        # Send the command. Do this in a loop here with timing controlled by the controller.
-        # command = {"command": "capture", "args": {"number": number, "interval": interval, "recover": recover}}
-        # self._send_command(command)
-        self.log_message = "Capturing images."
-        log.info(self.log_message)
+    def capture_images(self, name: str="IMG_", number: int=1, interval: float=0.0, recover: bool=False) -> bool:
+        try:
+            n = 1
+            while n <= number:
+                filename = "{name}_{n:02d}".format(name=name, n=n)
+                fmt = ".jpg"
+                command = {"command": "captureFrame", "args": {"filename": filename, "format": fmt}}
+                capture_time = time.time()
+                self._send_command(command)
+                n += 1
+                self.log_message = "Capturing image {n} called {filename}...".format(n=n, filename=filename)
+                self.frontend_log_messages.append(self.log_message)
+                elapsed = capture_time - time.time()
+                sleep(interval-elapsed)
+            return True
+        except Exception:
+            return False
 
     def reboot_cameras(self):
         for camera in self.cameras:
@@ -130,9 +165,6 @@ class Controller:
         self.password = password
         if  self.password == None:
             self._set_ssh_credentials()
-
-        # Close any open TCP connections.
-        self._close_TCP_connections()
 
         # Scan network for valid IP addresses with devices.
         if network == None:
@@ -164,7 +196,7 @@ class Controller:
                 ip = future.result()[2]
                 if found:
                     mac = getmac.get_mac_address(ip=ip)
-                    self.cameras.update({hostname: {"ip": ip, "mac": mac, "ready": False, "tcp": False}})
+                    self.cameras.update({hostname: {"ip": ip, "mac": mac, "ready": False, "http": False}})
                     self.log_message = "RPi camera called {name} found at {ip} with MAC address: {mac}".format(name=hostname, ip=ip, mac=mac)
                     self.frontend_log_messages.append(self.log_message)
                     log.info(self.log_message)
@@ -191,9 +223,8 @@ class Controller:
                         log.warning(self.log_message)
                     self.cameras[camera]["ready"] = ready
 
-            #Check status of cameras communications.
+            # Check status of cameras communications.
             self._check_status()
-            self._close_TCP_connections()
             return self.cameras
         else:
             self.log_message = "No RPi cameras found on the network."
@@ -229,108 +260,41 @@ class Controller:
         time.sleep(1)
 
     def _check_status(self) -> bool:
-        # Open TCP connection for each camera in a separate thread.
+        # Check HTTP connection for each camera in a separate thread.
         found_all_cameras = False
-        self.log_message = "Opening TCP connection to cameras."
-        self.frontend_log_messages.append(self.log_message)
-        log.info(self.log_message)
-        self.threads_running.set()
-        for camera in self.cameras:
-            self.cameras[camera]["tcp"] = False     # Set the TCP flag to False so that we check the TCP connection.
-            thread = threading.Thread(target=self._open_TCP_connection, args=(self.threads_running, self.cameras[camera],))
-            thread.setDaemon(True)
-            thread.start()
-            self.threads.append(thread)
 
-        # Send command via UDP to get MAC address of found devices and await response on TCP.
+        # Send command via UDP to get MAC address of found devices and await response via HTTP request.
         self.log_message = "Sending UDP command to get MAC addresses."
         log.debug(self.log_message)
         cmd = {"command": "get_hostname_ip_mac"}
-        self.tcp_connections = 0
-        timeout = 30.0
+        self.http_responses = 0
+        timeout = 5.0
         start_time = time.time()
         elapsed_time = 0.0
-        while elapsed_time < timeout and self.tcp_connections < len(self.cameras):
+        while elapsed_time < timeout and self.http_responses < len(self.cameras):
             elapsed_time = time.time() - start_time
             self._send_command(cmd)
             time.sleep(1)
             while not self.message_buffer.empty():
                 message = self.message_buffer.get()
                 hostname = message["response"]["hostname"]
-                if self.cameras[hostname]["tcp"] == False:
+                if self.cameras[hostname]["http"] == False:
                     ip_addr = self.cameras[hostname]["ip"]
-                    self.cameras[hostname]["tcp"] = True    # TCP connection working so set flag True.
+                    self.cameras[hostname]["http"] = True    # HTTP connection working so set flag True.
                     self.cameras[hostname]["ready"] = self._check_camera_running(ip_addr) # Check camera.
-                    self.tcp_connections += 1
-                    self.log_message = "Camera at {ip} is ready for acquisition via TCP".format(ip=ip_addr)
+                    self.http_responses += 1
+                    self.log_message = "Camera at {ip} is ready for acquisition via HTTP".format(ip=ip_addr)
                     self.frontend_log_messages.append(self.log_message)
                     log.info(self.log_message) 
 
         # Check all cameras have been found.
         found_all_cameras = True
         for camera in self.cameras:
-            if self.cameras[camera]["tcp"] == False:
+            if self.cameras[camera]["http"] == False:
                 found_all_cameras = False
                 break
         
         return found_all_cameras
-
-    def _open_TCP_connection(self, thread_running, camera: dict) -> None:
-        # Open TCP client connection to camera.
-        ip = camera["ip"]
-        self.log_message = "Opening TCP connection to camera at {ip}".format(ip=ip)
-        self.frontend_log_messages.append(self.log_message)
-        log.debug(self.log_message)
-        TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        connected = False
-        self.log_message = "Trying to connect to camera at {ip}".format(ip=ip)
-        self.frontend_log_messages.append(self.log_message)
-        log.info(self.log_message)
-        start_time = time.time()
-        elapsed_time = 0.0
-        timeout = 20.0
-        while elapsed_time < timeout and not connected and thread_running.is_set():
-            try:
-                TCP_socket.connect((ip, TCP_PORT))
-                self.log_message = "Connected to camera via TCP on {ip}:{port}".format(ip=ip, port = TCP_PORT)
-                self.frontend_log_messages.append(self.log_message)
-                log.info(self.log_message)
-                connected = True
-                start_time = time.time()
-            except Exception:
-                time.sleep(1)
-
-            if connected:
-                self.log_message = "Waiting for response via TCP from camera at {ip}".format(ip=ip)
-                self.frontend_log_messages.append(self.log_message)
-                log.info(self.log_message)
-            while connected and thread_running.is_set():
-                data = TCP_socket.recv(1024)
-                message = data.decode('utf-8')
-                if message == "":
-                    connected = False
-                    self.log_message = "TCP connection closed by camera at {ip}".format(ip=ip)
-                    self.frontend_log_messages.append(self.log_message)
-                    log.warning(self.log_message)
-                else:
-                    try:
-                        message = json.loads(message)
-                        if "response" in message:
-                            self.message_buffer.put(message)
-                            connected = False
-                        if "image" in message:
-                            self.log_message = "Saving image..."
-                            log.debug(self.log_message)
-                            # Save image to file.
-                    except Exception:
-                        print(Exception)
-                        pass
-            elapsed_time = time.time() - start_time
-        TCP_socket.close()
-
-    def _close_TCP_connections(self) -> None:
-        # Close TCP connections to cameras.
-        self.threads_running.clear()
 
     def _send_command(self, command: str) -> None:
         try: 
@@ -574,6 +538,30 @@ class Controller:
         if package == "getmac":
             wheel = self.getmac_wheel
             wheel_name = self.getmac_wheel_name
+        elif package == "blinker":
+            wheel = self.blinker_wheel
+            wheel_name = self.blinker_wheel_name
+        elif package == "click":
+            wheel = self.click_wheel
+            wheel_name = self.click_wheel_name
+        elif package == "itsdangerous":
+            wheel = self.itsdangerous_wheel
+            wheel_name = self.itsdangerous_wheel_name
+        elif package == "Jinja2":
+            wheel = self.Jinja2_wheel
+            wheel_name = self.Jinja2_wheel_name
+        elif package == "Werkzeug":
+            wheel = self.Werkzeug_wheel
+            wheel_name = self.Werkzeug_wheel_name
+        elif package == "MarkupSafe":
+            wheel = self.MarkupSafe_wheel
+            wheel_name = self.MarkupSafe_wheel_name
+        elif package == "Flask":
+            wheel = self.Flask_wheel
+            wheel_name = self.Flask_wheel_name
+        elif package == "Flask-Cors":
+            wheel = self.Flask_Cors_wheel
+            wheel_name = self.Flask_Cors_wheel_name
 
         c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
         # Upload package to RPi.
