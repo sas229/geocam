@@ -6,7 +6,7 @@
                 <input @change="isNumberValid" type="number" placeholder="Number" min="1" step="1" :aria-invalid="!numberValid" v-model="number" data-tooltip="Number of images to capture...">
                 <input @change="isIntervalValid" type="number" placeholder="Interval" min="0" step="0.1" :aria-invalid="!intervalValid" v-model="interval" data-tooltip="Interval between images...">
                 <button @click="captureImages" :disabled="!captureSettingsValid" data-tooltip="Capture images...">Capture</button>
-                <button @click="recoverImages" class="secondary" :disabled="!captureSettingsValid" data-tooltip="Recover images...">Recover</button>
+                <button @click="recoverImages" class="secondary" data-tooltip="Recover images...">Recover</button>
             </div>
             <label>
             <input type="checkbox" id="recover" name="recover" v-model="recover">
@@ -19,6 +19,17 @@
     <dialog open>
       <article class="fixedWidth">
         <h3>Capturing images...</h3>
+        <progress></progress>
+        <footer class="leftAligned">
+          <small >{{ logMessage }}</small>
+        </footer>
+      </article>
+    </dialog>
+  </div>
+  <div v-if="recoveringImages">
+    <dialog open>
+      <article class="fixedWidth">
+        <h3>Recovering images...</h3>
         <progress></progress>
         <footer class="leftAligned">
           <small >{{ logMessage }}</small>
@@ -43,6 +54,7 @@ const numberValid = ref(false)
 const intervalValid = ref(false)
 const captureSettingsValid = ref(false)
 const capturingImages = ref(false)
+const recoveringImages = ref(false)
 const logMessage = ref('')
 const recover = ref(false)
 
@@ -74,6 +86,10 @@ function checkCameraSettings() {
 
 function toggleCapturingImages() {
     capturingImages.value = !capturingImages.value;
+}
+
+function toggleRecoveringImages() {
+    recoveringImages.value = !recoveringImages.value;
 }
 
 async function getLogMessage() {
@@ -122,8 +138,30 @@ async function captureImages() {
   }
 }
 
-function recoverImages() {
+async function recoverImages() {
     console.log("Recovering images...");
+    toggleRecoveringImages();
+  try {
+    let messageUpdated = false;
+    const logMessageInterval = setInterval(async () => {
+      if (!messageUpdated) {
+        await getLogMessage();
+        messageUpdated = true;
+      } else {
+        messageUpdated = false;
+      }
+    }, 50);
+    let response = await axios({
+      method: 'get',
+      url: '/recoverImages',
+    });
+    let success = response.data["success"]
+    console.log("Initiated image recovery: " + success)
+    clearInterval(logMessageInterval);
+    toggleRecoveringImages();
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 </script>

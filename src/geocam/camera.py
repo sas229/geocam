@@ -229,8 +229,8 @@ def update_controls():
 def capture_frame(args):
     filename = args["filename"]
     fmt = args["format"]
-    path = "{filename}.{fmt}".format(filename=filename, fmt=fmt)
-    with open(path, "wb") as image_file:
+    image = "{filename}.{fmt}".format(filename=filename, fmt=fmt)
+    with open(image, "wb") as image_file:
         # Write bytes image to file.
         image_file.write(camera.frame)
 
@@ -252,9 +252,7 @@ def listen_on_UDP():
                 RPI_ADDR_AND_MAC = {"hostname":camera._get_hostname(), "ip":camera._get_ip_address(), "mac":camera._get_mac_address()}
                 message = {"response": RPI_ADDR_AND_MAC}
                 url = "http://{ip_addr}:8001/cameraResponse".format(ip_addr=ip_addr[0])
-                response = requests.post(url, json=message)
-                response_json = response.json()
-                print(response_json)
+                requests.post(url, json=message)
             if command["command"] == "captureFrame":
                 capture_frame(command["args"])
         except Exception: 

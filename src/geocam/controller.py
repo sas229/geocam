@@ -22,7 +22,7 @@ import base64
 import time
 
 # Initialise log at default settings.
-level = logging.DEBUG
+level = logging.INFO
 gc.log.initialise(level)
 logging.getLogger('paramiko').setLevel(logging.FATAL)
 log = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ class Controller:
             n = 1
             while n <= number:
                 filename = "{name}_{n:02d}".format(name=name, n=n)
-                fmt = ".jpg"
+                fmt = "jpg"
                 command = {"command": "captureFrame", "args": {"filename": filename, "format": fmt}}
                 capture_time = time.time()
                 self._send_command(command)
@@ -149,7 +149,35 @@ class Controller:
             return True
         except Exception:
             return False
+        
+    def recover_images(self):
+        self.log_message = "Initiating image recovery..."
+        self.frontend_log_messages.append(self.log_message)
+        log.info(self.log_message)
+        for camera in self.cameras:
+            ip_addr = self.cameras[camera]['ip']
+            self.log_message = "Recovering images from {camera} at {ip_addr}".format(camera=camera, ip_addr=ip_addr)
+            self.frontend_log_messages.append(self.log_message)
+            log.info(self.log_message)
+            c = Connection(host=ip_addr, user=self.username, connect_kwargs={"password": self.password})
+            try:
+                result = c.sudo("ls *.jpg", hide=True)
+                image_list_str = result.stdout
+                image_list = image_list_str.splitlines()
+                for image in image_list:
+                    destination = "images/{camera}/{image}".format(camera=camera, image=image)
+                    self.log_message = "Recovering image {image} from {camera} at {ip_addr}".format(image=image, camera=camera, ip_addr=ip_addr)
+                    self.frontend_log_messages.append(self.log_message)
+                    log.info(self.log_message)
+                    c.get("/home/{username}/{image}".format(username=self.username, image=image), destination)
+            except Exception:
+                self.log_message = "No images to recover..."
+                self.frontend_log_messages.append(self.log_message)
+                log.warning(self.log_message)
+                sleep(2)
+            c.close()
 
+    
     def reboot_cameras(self):
         for camera in self.cameras:
             ip_addr = self.cameras[camera]['ip']

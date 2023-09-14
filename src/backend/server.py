@@ -43,6 +43,13 @@ def captureImages():
     response = {"success": success}
     return jsonify(response)
 
+@app.route('/recoverImages', methods=['GET'])
+def recoverImages():
+    if request.method == 'GET':
+        controller.recover_images()
+        response = {"success": True}
+        return jsonify(response)
+
 @app.route('/findCameras', methods=['POST'])
 def findCameras():
     if request.method == 'POST':
