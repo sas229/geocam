@@ -1,14 +1,14 @@
 <template>
   <div class="grid">
-    <input v-if="!configured" @change="checkLogin" type="text" v-model="id" placeholder="username" :aria-invalid="!idValid" data-tooltip="Input the RPi id to search for...">
-    <input v-if="!configured" @change="checkLogin" type="text" v-model="password" placeholder="password" :aria-invalid="!passwordValid" data-tooltip="Input the RPi password to search for...">
+    <input v-if="!store.configured" @change="checkLogin" type="text" v-model="id" placeholder="username" :aria-invalid="!idValid" data-tooltip="Input the RPi id to search for...">
+    <input v-if="!store.configured" @change="checkLogin" type="text" v-model="password" placeholder="password" :aria-invalid="!passwordValid" data-tooltip="Input the RPi password to search for...">
     <button @click="selectConfiguration" :disabled="!loginValid" data-tooltip="Load a configuration...">Load</button>
-    <button v-if="configured" @click="saveConfiguration" data-tooltip="Save the configuration...">Save</button>
-    <button v-if="configured" @click="clearConfiguration" data-tooltip="Clear the configuration...">Clear</button>
-    <button v-if="!configured" @click="findCameras" class="contrast" :disabled="!loginValid" data-tooltip="Find cameras with current ID and password...">Find Cameras</button>
+    <button v-if="store.configured" @click="saveConfiguration" data-tooltip="Save the configuration...">Save</button>
+    <button v-if="store.configured" @click="clearConfiguration" data-tooltip="Clear the configuration...">Clear</button>
+    <button v-if="!store.configured" @click="findCameras" class="contrast" :disabled="!loginValid" data-tooltip="Find cameras with current ID and password...">Find Cameras</button>
   </div>
   <br>
-  <table v-if="configured">
+  <table v-if="store.configured">
     <tr>
       <th>Hostname</th>
       <th>IP</th>
@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref } from 'vue'
+
 import { useGeocamStore } from '@/stores/geocam'
 import axios from 'axios'
 axios.defaults.baseURL = "http://0.0.0.0:8001/";
@@ -65,7 +66,6 @@ const passwordValid = ref(false)
 const findingCameras = ref(false)
 const loadingConfiguration = ref(false)
 const logMessage = ref('')
-const configured = ref(false)
 const loginValid = ref(false)
 
 // Functions.
@@ -140,7 +140,7 @@ async function loadConfiguration(data) {
     clearInterval(logMessageInterval);
     store.cameras = response.data;
     if (Object.keys(store.cameras).length > 0) {
-      configured.value = true;
+      store.configured.value = true;
     }
   } catch (error) {
     console.error(error);
@@ -163,7 +163,7 @@ function saveConfiguration() {
 
 async function clearConfiguration() {
   console.log('Clearing configuration')
-  configured.value = false
+  store.configured.value = false
   id.value = ''
   password.value = ''
   store.cameras = {}
@@ -182,9 +182,9 @@ async function clearConfiguration() {
     });
     store.cameras = response.data;
     if (Object.keys(store.cameras).length > 0) {
-      configured.value = true;
+      store.configured.value = true;
     } else {
-      configured.value = false;
+      store.configured.value = false;
     }
   } catch (error) {
     console.error(error);
@@ -216,7 +216,7 @@ async function findCameras() {
     clearInterval(logMessageInterval);
     store.cameras = response.data;
     if (Object.keys(store.cameras).length > 0) {
-      configured.value = true;
+      store.configured = true;
     }
     toggleFindingCameras();
   } catch (error) {

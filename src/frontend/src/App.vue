@@ -38,6 +38,9 @@ import Preview from './components/Preview.vue'
 import Capture from './components/Capture.vue'
 import About from './components/About.vue'
 import { useGeocamStore } from '@/stores/geocam'
+import { onBeforeMount } from 'vue'
+import axios from 'axios'
+axios.defaults.baseURL = "http://0.0.0.0:8001/";
 
 const store = useGeocamStore()
 
@@ -47,4 +50,22 @@ function clickedNav(event) {
   console.log(event.target.innerText)
   currentComponent.value = event.target.innerText
 }
+
+onBeforeMount(() => {
+  console.log("Testing onBeforeMount...")
+  axios.get('getConfiguration')
+  .then(function (response) {
+    console.log(response.data)
+    store.cameras = response.data;
+    console.log(store.cameras)
+    if (Object.keys(store.cameras).length > 0) {
+      store.configured.value = true;
+    }
+  })
+  .catch(function (error) {
+  console.error(error);
+  })
+})
+
+
 </script>

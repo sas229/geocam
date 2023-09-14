@@ -22,7 +22,7 @@ import base64
 import time
 
 # Initialise log at default settings.
-level = logging.INFO
+level = logging.DEBUG
 gc.log.initialise(level)
 logging.getLogger('paramiko').setLevel(logging.FATAL)
 log = logging.getLogger(__name__)
@@ -200,6 +200,10 @@ class Controller:
                     self.log_message = "RPi camera called {name} found at {ip} with MAC address: {mac}".format(name=hostname, ip=ip, mac=mac)
                     self.frontend_log_messages.append(self.log_message)
                     log.info(self.log_message)
+                else:
+                    self.log_message = "No RPi camera found at {ip}".format(ip=ip)
+                    self.frontend_log_messages.append(self.log_message)
+                    log.debug(self.log_message)
     
         # If cameras are found, check control script and packages using ThreadPool.
         if len(self.cameras) > 0:
@@ -341,10 +345,10 @@ class Controller:
             if id in hostname:
                 return True, hostname, ip_addr
             else:
-                return False, "none", "none"
+                return False, "none", ip_addr
         except Exception:
             c.close()
-            return False, "none", "none"
+            return False, "none", ip_addr
 
     def _check_camera_control_script(self, ip_addr: str) -> bool:
         # Check if the camera control script is installed.

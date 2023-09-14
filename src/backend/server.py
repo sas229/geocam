@@ -25,6 +25,13 @@ controller = gc.controller.Controller()
 def index():
     return render_template('index.html')
 
+@app.route('/getConfiguration', methods=['GET'])
+def getConfiguration():
+    if request.method == 'GET':
+        configuration = controller.cameras
+        print(configuration)
+        return jsonify(configuration)
+
 @app.route('/captureImages', methods=['POST'])
 def captureImages():
     data = request.json

@@ -183,7 +183,7 @@ function setCameraControl(event) {
   console.log(currentControl.value)
 }
 
-async function setPreviewCamera() {
+function setPreviewCamera() {
   if (previewCamera.value === '') {
     preview = ''
   } else {
