@@ -34,7 +34,7 @@ dependencies = [
     "getmac==0.9.4",
     "requests==2.31.0",
     "flask==2.3.2",
-    "flask_cors==5.0.0",
+    "Flask_Cors==5.0.0",
 ]
 
 [project.urls]
