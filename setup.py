@@ -1,12 +1,12 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
-    packages=find_packages(where="src", include=["geocam*", "geocam.dependencies*"]),
+    packages = ["geocam", "geocam.dependencies", "backend.server"],
     package_dir={"": "src"},
     package_data={"geocam.dependencies":['*'],},
     entry_points={
         "console_scripts": [
-            "run-server=geocam.backend.server:main",
+            "geocam-server=backend.server:main",
         ],
     },
 )
