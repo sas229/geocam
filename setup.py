@@ -7,14 +7,15 @@ setup(
     package_dir={"": "src"},
     package_data={
         "geocam.dependencies":['*'],
-        "backend": [
+        "server": [
             "frontend/*",
             "frontend/**/*",
+            "frontend/**/**/*",
         ],
     },
     entry_points={
         "console_scripts": [
-            "geocam-server=backend.server:run",
+            "geocam-server=server.launcher:run",
         ],
     },
 )

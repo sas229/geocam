@@ -8,7 +8,7 @@ import os
 
 # Set absolute paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Directory of server.py
-FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "../frontend/app"))
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "frontend/app"))
 
 # Disable werkzeug logging.
 log = logging.getLogger('werkzeug')
