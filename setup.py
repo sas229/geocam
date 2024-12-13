@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    packages = ["geocam", "geocam.dependencies", "backend.server"],
+    packages = ["geocam", "geocam.dependencies", "backend"],
     package_dir={"": "src"},
     package_data={"geocam.dependencies":['*'],},
     entry_points={
