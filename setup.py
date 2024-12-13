@@ -9,6 +9,7 @@ setup(
         "geocam.dependencies":['*'],
         "backend": [
             "frontend/*",
+            "frontend/**/*",
         ],
     },
     entry_points={
