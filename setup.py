@@ -7,7 +7,9 @@ setup(
     package_dir={"": "src"},
     package_data={
         "geocam.dependencies":['*'],
-        "frontend":['*'],
+        "backend": [
+            "frontend":['*']
+        ],
     },
     entry_points={
         "console_scripts": [
