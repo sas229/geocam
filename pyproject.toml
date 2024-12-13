@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geocam"
-version = "0.0.6"
+version = "0.0.7"
 authors = [
   { name="Hilario Greggi", email="greggi.hilario@gmail.com" },
   { name="Sam Stanier", email="sas229@cam.ac.uk" },
