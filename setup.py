@@ -6,7 +6,7 @@ setup(
     package_data={"geocam.dependencies":['*'],},
     entry_points={
         "console_scripts": [
-            "run-server=backend.server:main",
+            "run-server=geocam.backend.server:main",
         ],
     },
 )
