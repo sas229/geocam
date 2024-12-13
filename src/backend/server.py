@@ -4,13 +4,18 @@ import webbrowser
 import geocam as gc
 import logging
 from threading import Timer
+import os
+
+# Set absolute paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Directory of server.py
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "../frontend/app"))
 
 # Disable werkzeug logging.
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 # Create Flask app and serve static Vue SPA.
-app = Flask(__name__, static_folder = "./../frontend/app/assets", template_folder = "./../frontend/app")
+app = Flask(__name__, static_folder=os.path.join(FRONTEND_DIR, "assets"), template_folder=FRONTEND_DIR)
 # app = Flask(__name__)
 CORS(app)
 host = "0.0.0.0"
